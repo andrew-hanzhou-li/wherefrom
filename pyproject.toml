@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wherefrom"
+version = "0.1.0"
+description = "Remember where your downloaded files came from, even after they're copied or renamed."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "andrew-hanzhou-li" }]
+classifiers = [
+    "Operating System :: Microsoft :: Windows",
+    "Environment :: Win32 (MS Windows)",
+    "Topic :: Desktop Environment :: File Managers",
+]
+
+[project.scripts]
+wherefrom = "wherefrom.cli:main"
+
+[project.gui-scripts]
+wherefromw = "wherefrom.cli:main"
+
+[tool.setuptools]
+packages = ["wherefrom"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

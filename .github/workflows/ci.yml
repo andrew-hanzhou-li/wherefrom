@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.12"
+          - os: windows-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.13"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install
+        run: pip install pytest
+
+      - name: Run tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest -v -rs 2>&1 | tee test-output.txt
+
+      - name: Post the test summary
+        if: always()
+        shell: bash
+        run: |
+          [ -f test-output.txt ] || exit 0
+          grep -E "[0-9]+ (passed|failed|skipped)|^SKIPPED" test-output.txt \
+            | tail -n 8 | while IFS= read -r line; do echo "::notice::${line:0:400}"; done
+
+      - name: Show failures as annotations
+        if: failure()
+        shell: bash
+        run: |
+          [ -f test-output.txt ] || exit 0
+          { grep -E 'FAIL|ERROR|Error|assert|Traceback|failed' test-output.txt || true; tail -n 5 test-output.txt; } \
+            | awk '!seen[$0]++' | head -n 20 | while IFS= read -r line; do echo "::error::${line:0:400}"; done
+
+  build:
+    # The two .exe files: wherefrom.exe for the command line, wherefromw.exe
+    # (no console window) for the right-click menu and start at login.
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Build
+        shell: bash
+        run: |
+          pip install pyinstaller==6.22.3
+          pyinstaller --onefile --name wherefrom --paths . packaging/entry.py
+          pyinstaller --onefile --noconsole --name wherefromw --paths . packaging/entry.py
+
+      - name: Check the built program
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $env:WHEREFROM_HOME = "$env:RUNNER_TEMP\wf-home"
+          .\dist\wherefrom.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "--version failed" }
+          # A file with a real Mark of the Web, like a browser would leave
+          $file = "$env:RUNNER_TEMP\report.pdf"
+          Set-Content -Path $file -Value "pdf bytes"
+          Set-Content -Path $file -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3`r`nHostUrl=https://example.com/report.pdf"
+          $out = .\dist\wherefrom.exe show $file | Out-String
+          Write-Output $out
+          if ($out -notmatch "https://example.com/report.pdf") { throw "show didn't find the source" }
+          # A renamed copy without the mark is still traced by its contents
+          $copy = "$env:RUNNER_TEMP\renamed copy.pdf"
+          Copy-Item $file $copy -Force
+          Remove-Item -Path $copy -Stream Zone.Identifier
+          $out = .\dist\wherefrom.exe show $copy | Out-String
+          Write-Output $out
+          if ($out -notmatch "https://example.com/report.pdf") { throw "the copy wasn't traced" }
+          Write-Output "::notice::Built wherefrom.exe; it read a real Mark of the Web and traced a renamed copy"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wherefrom-windows
+          path: |
+            dist/wherefrom.exe
+            dist/wherefromw.exe
