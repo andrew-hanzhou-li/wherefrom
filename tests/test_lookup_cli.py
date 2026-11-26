@@ -118,7 +118,8 @@ def test_main_import_browsers(tmp_path, capsys, monkeypatch):
     monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
     monkeypatch.setenv("WHEREFROM_HOME", str(tmp_path / "home"))
     assert cli.main(["import-browsers"]) == 0
-    assert "chrome: 1 downloads in history, 1 new file(s) recorded (Default)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert out.index("Reading chrome (Default)...") < out.index("chrome: 1 downloads in history, 1 new file(s) recorded (Default)")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "empty"))
     assert cli.main(["import-browsers"]) == 1
 

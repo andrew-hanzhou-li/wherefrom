@@ -98,7 +98,10 @@ def cmd_scan(args, ledger):
 
 
 def cmd_import(args, ledger):
-    results = browsers.import_all(ledger)
+    def reading(browser, history):
+        # Every downloaded file still on disk gets read, which can take a while
+        print(f"Reading {browser} ({history.parent.name})...", flush=True)
+    results = browsers.import_all(ledger, on_start=reading)
     if not results:
         print("No browser history found (Chrome, Edge, Brave, Vivaldi or Firefox).")
         return 1

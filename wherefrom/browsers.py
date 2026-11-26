@@ -156,8 +156,10 @@ def import_history(ledger, browser, history_file):
     return len(downloads), recorded
 
 
-def import_all(ledger, local_appdata=None, appdata=None):
-    """Import from every browser found. Returns [(browser, file, total, new)]."""
+def import_all(ledger, local_appdata=None, appdata=None, on_start=None):
+    """Import from every browser found. Returns [(browser, file, total, new)].
+    on_start(browser, history_file) is called before each one, because
+    hashing every downloaded file can take a while."""
     local_appdata = local_appdata or os.environ.get("LOCALAPPDATA", "")
     appdata = appdata or os.environ.get("APPDATA", "")
     results = []
@@ -167,6 +169,8 @@ def import_all(ledger, local_appdata=None, appdata=None):
     if appdata:
         histories += firefox_histories(appdata)
     for browser, history in histories:
+        if on_start:
+            on_start(browser, history)
         try:
             total, new = import_history(ledger, browser, history)
         except (OSError, sqlite3.Error) as error:
