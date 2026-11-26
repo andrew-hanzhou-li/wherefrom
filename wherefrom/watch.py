@@ -8,8 +8,10 @@ from pathlib import Path
 
 from . import zone
 
-# Browsers download into these and rename the file when it's complete
-PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".tmp", ".download", ".opdownload")
+# Browsers download into these and rename the file when it's complete; the
+# last one is wherefrom's own sidecar files
+PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".tmp", ".download", ".opdownload",
+                    ".wherefrom.json")
 
 
 def file_hash(path, chunk_size=1024 * 1024):
@@ -37,10 +39,11 @@ class Watcher:
     size and modified time in two scans in a row, so it isn't read while a
     browser is still writing it."""
 
-    def __init__(self, ledger, folders, read_mark=zone.read):
+    def __init__(self, ledger, folders, read_mark=zone.read, sidecars=False):
         self.ledger = ledger
         self.folders = [Path(f) for f in folders]
         self.read_mark = read_mark
+        self.sidecars = sidecars        # also write a .wherefrom.json next to each file
         self.pending = {}           # path -> (size, mtime) from the last scan
         # The ledger's own files change every time it records something; if
         # they're in a watched folder, reading them would never end
@@ -92,6 +95,12 @@ class Watcher:
         except OSError:
             return 0                # locked or gone; try again next scan
         added = self.ledger.add(sha256, size, path, mark=mark, source="mark")
+        if self.sidecars:
+            from .portable import write_sidecar
+            try:
+                write_sidecar(path, self.ledger.by_hash(sha256)[0])
+            except OSError:
+                pass                # a read-only folder: the ledger still has it
         self.ledger.mark_seen(path, *state)
         return 1 if added else 0
 

@@ -65,6 +65,10 @@ def look_up(path, ledger, read_mark=zone.read):
         return Finding(path, mark, [], error=f"Can't read the file: {error.strerror or error}")
     if mark is not None and mark.has_source:
         ledger.add(sha256, size, path, mark=mark, source="mark")
+    # A sidecar that came along with the file (only if its SHA-256 matches)
+    from .portable import add_entry, sidecars_for
+    for entry in sidecars_for(path, sha256):
+        add_entry(ledger, entry, "sidecar", path=path)
     return Finding(path, mark, ledger.by_hash(sha256))
 
 

@@ -4,20 +4,10 @@ import argparse
 import sys
 from datetime import datetime
 
-from . import __version__, browsers, shell
-from .ledger import Ledger
+from . import __version__, browsers, portable, shell
+from .ledger import SOURCE_NAMES, Ledger
 from .lookup import look_up
 from .watch import Watcher, downloads_folder
-
-SOURCE_NAMES = {
-    "mark": "the file's Mark of the Web",
-    "chrome": "Chrome's download history",
-    "edge": "Edge's download history",
-    "brave": "Brave's download history",
-    "vivaldi": "Vivaldi's download history",
-    "firefox": "Firefox's download history",
-}
-
 
 def when(text):
     """'2026-11-20T14:03:11' -> '2026-11-20 14:03'."""
@@ -81,7 +71,7 @@ def cmd_watch(args, ledger):
     folders = args.folder or [downloads_folder()]
     print("Watching " + ", ".join(str(f) for f in folders) + " (Ctrl+C to stop)")
     try:
-        Watcher(ledger, folders).run(interval=args.interval)
+        Watcher(ledger, folders, sidecars=args.sidecars).run(interval=args.interval)
     except KeyboardInterrupt:
         pass
     return 0
@@ -95,6 +85,31 @@ def cmd_scan(args, ledger):
     print(f"Recorded the source of {recorded} new file(s) in "
           + ", ".join(str(f) for f in folders))
     return 0
+
+
+def cmd_export(args, ledger):
+    count = portable.export(ledger, args.file)
+    print(f"Wrote {count} record(s) to {args.file}. On another computer: wherefrom import {args.file}")
+    return 0
+
+
+def cmd_import_file(args, ledger):
+    try:
+        new, invalid = portable.import_file(ledger, args.file)
+    except (OSError, portable.BadFile) as error:
+        print(f"Can't import {args.file}: {error}", file=sys.stderr)
+        return 1
+    print(f"Imported {new} new record(s)" + (f"; skipped {invalid} damaged one(s)" if invalid else "") + ".")
+    return 0
+
+
+def cmd_sidecar(args, ledger):
+    written, unknown = portable.make_sidecars(ledger, args.files)
+    for path in written:
+        print(f"Wrote {path}")
+    for path in unknown:
+        print(f"No record for {path}; nothing written", file=sys.stderr)
+    return 0 if written else 1
 
 
 def cmd_import(args, ledger):
@@ -160,7 +175,22 @@ def build_parser():
         if name == "watch":
             command.add_argument("--interval", type=float, default=5.0,
                                  help="seconds between checks (default 5)")
+            command.add_argument("--sidecars", action="store_true",
+                                 help="also write a .wherefrom.json next to each new file, so its "
+                                      "source travels with it")
         command.set_defaults(run=run)
+
+    export = sub.add_parser("export", help="save every record to a file, e.g. for a new computer")
+    export.add_argument("file")
+    export.set_defaults(run=cmd_export)
+
+    imp_file = sub.add_parser("import", help="add the records from a wherefrom export")
+    imp_file.add_argument("file")
+    imp_file.set_defaults(run=cmd_import_file)
+
+    side = sub.add_parser("sidecar", help="write FILE.wherefrom.json so the source travels with the file")
+    side.add_argument("files", nargs="+", metavar="file")
+    side.set_defaults(run=cmd_sidecar)
 
     imp = sub.add_parser("import-browsers", help="add your browsers' download history")
     imp.set_defaults(run=cmd_import)
