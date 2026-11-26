@@ -158,3 +158,16 @@ def test_gui_window_opens_and_closes(tmp_path, ledger, monkeypatch):
     gui.show(lookup.look_up(f, ledger, read_mark=FakeMarks({"a.pdf": web_mark()})))
     gui.show(lookup.look_up(tmp_path / "missing.pdf", ledger))
     assert opened == ["Where did this come from?"] * 2
+
+
+def test_output_to_an_old_code_page_does_not_crash(tmp_path, monkeypatch):
+    import io
+    f = tmp_path / "日本語のファイル.pdf"
+    f.write_bytes(b"a")
+    marks = FakeMarks({f.name: Mark(3, "https://例え.jp/x.pdf", None)})
+    monkeypatch.setattr(cli, "look_up", lambda p, ledger: lookup.look_up(p, ledger, read_mark=marks))
+    raw = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
+    assert cli.main(["show", str(f)]) == 0
+    sys.stdout.flush()
+    assert b"https://??.jp/x.pdf" in raw.getvalue()

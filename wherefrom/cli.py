@@ -173,6 +173,11 @@ def build_parser():
 
 
 def main(argv=None):
+    # Redirected output on Windows uses the old code page, which can't hold
+    # every file name or URL; print "?" for those characters instead of crashing.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     args = build_parser().parse_args(argv)
     if args.command in ("install", "uninstall") and sys.platform != "win32":
         print("install and uninstall are for Windows.", file=sys.stderr)
