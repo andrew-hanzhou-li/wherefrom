@@ -76,6 +76,10 @@ class Ledger:
         # The watcher and a "show" from the context menu can run at once;
         # wait a little for each other instead of failing.
         self.db = sqlite3.connect(str(path), timeout=10)
+        # SQLite's own lower() and LIKE only fold ASCII letters, so "Über.pdf"
+        # wouldn't match "über"; search with Python's full case folding instead.
+        self.db.create_function("fold", 1, lambda s: s.casefold() if isinstance(s, str) else s,
+                                deterministic=True)
         self.db.executescript(SCHEMA)
 
     def close(self):
@@ -117,14 +121,14 @@ class Ledger:
 
     def search(self, text, limit=200):
         """Records whose URLs or file name contain `text` (any case)."""
-        pattern = "%" + escape_like(text.lower()) + "%"
+        pattern = "%" + escape_like(text.casefold()) + "%"
         rows = self.db.execute(
             """SELECT sha256, size, name, path, host_url, referrer_url, zone_id, source,
                       downloaded_at, recorded_at
                FROM files
-               WHERE lower(COALESCE(host_url, '')) LIKE ? ESCAPE '\\'
-                  OR lower(COALESCE(referrer_url, '')) LIKE ? ESCAPE '\\'
-                  OR lower(name) LIKE ? ESCAPE '\\'
+               WHERE fold(COALESCE(host_url, '')) LIKE ? ESCAPE '\\'
+                  OR fold(COALESCE(referrer_url, '')) LIKE ? ESCAPE '\\'
+                  OR fold(name) LIKE ? ESCAPE '\\'
                ORDER BY COALESCE(downloaded_at, recorded_at) DESC
                LIMIT ?""",
             (pattern, pattern, pattern, limit),

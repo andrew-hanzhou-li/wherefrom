@@ -27,7 +27,10 @@ def launcher(windowed):
     python = Path(sys.executable)
     if windowed and python.with_name("pythonw.exe").is_file():
         python = python.with_name("pythonw.exe")
-    return f'"{python}" -m wherefrom'
+    # -P: don't put the current folder on the module path. Explorer starts
+    # menu commands in the clicked file's folder (often Downloads), and a
+    # planted argparse.py there would otherwise run instead of Python's own.
+    return f'"{python}" -P -m wherefrom'
 
 
 class WindowsRegistry:

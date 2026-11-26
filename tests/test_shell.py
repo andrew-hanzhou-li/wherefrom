@@ -31,6 +31,8 @@ def test_install_adds_the_menu_entry():
     command = reg.values[(shell.MENU_KEY + r"\command", "")]
     assert command.endswith(' show --gui "%1"')     # quoted: paths can have spaces
     assert command.startswith('"')
+    if not getattr(__import__("sys"), "frozen", False):
+        assert " -P -m wherefrom " in command      # never imports from the clicked file's folder
     assert (shell.RUN_KEY, shell.RUN_VALUE) not in reg.values
 
 
@@ -60,3 +62,19 @@ def test_real_registry_round_trip():
     shell.uninstall(reg)
     assert reg.get_value(shell.MENU_KEY, "") is None
     assert reg.get_value(shell.RUN_KEY, shell.RUN_VALUE) is None
+
+
+def test_a_module_planted_next_to_the_file_does_not_run(tmp_path):
+    # Explorer runs the menu command in the clicked file's folder. Python's
+    # -m would import argparse.py from there instead of its own, unless -P.
+    import subprocess
+    (tmp_path / "argparse.py").write_text("print('PLANTED MODULE RAN')\nraise SystemExit(9)\n")
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    command = shell.launcher(windowed=False)
+    assert " -P -m wherefrom" in command
+    out = subprocess.run([sys.executable, "-P", "-m", "wherefrom", "--version"], cwd=tmp_path,
+                         capture_output=True, text=True, env={**os.environ, "PYTHONPATH": repo})
+    assert "PLANTED" not in out.stdout and out.returncode == 0
+    unsafe = subprocess.run([sys.executable, "-m", "wherefrom", "--version"], cwd=tmp_path,
+                            capture_output=True, text=True, env={**os.environ, "PYTHONPATH": repo})
+    assert "PLANTED" in unsafe.stdout          # shows the test would catch it

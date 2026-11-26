@@ -40,6 +40,12 @@ def test_search_urls_and_names_any_case(ledger):
     assert [r.name for r in ledger.search("gallery")] == ["photo.jpg"]
 
 
+def test_search_folds_any_letters(ledger):
+    ledger.add("aa", 1, "/d/Über Größe.pdf", host_url="https://Ärzte.example/x")
+    for text in ("über", "ÜBER", "größe", "GRÖSSE", "ärzte"):
+        assert [r.name for r in ledger.search(text)] == ["Über Größe.pdf"], text
+
+
 def test_search_wildcards_are_literal(ledger):
     ledger.add("aa", 1, "/d/a.txt", host_url="https://a.test/plain")
     ledger.add("bb", 1, "/d/100%_done.txt", host_url="https://b.test/x")
