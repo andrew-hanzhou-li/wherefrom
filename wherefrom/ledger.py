@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS seen (
 );
 """
 
+MAX_URL = 8192
+
 # Columns added after the first version; older ledgers get them on open.
 ADDED_COLUMNS = {
     "mime": "TEXT",             # the file type the server sent (from the browser extension)
@@ -113,7 +115,12 @@ class Ledger:
         have = {row[1] for row in self.db.execute("PRAGMA table_info(files)")}
         for column, kind in ADDED_COLUMNS.items():
             if column not in have:
-                self.db.execute(f"ALTER TABLE files ADD COLUMN {column} {kind}")  # nosec B608 - fixed names
+                try:
+                    self.db.execute(f"ALTER TABLE files ADD COLUMN {column} {kind}")  # nosec B608 - fixed names
+                except sqlite3.OperationalError as error:
+                    # Another process (the watcher, the browser's helper) just did it
+                    if "duplicate column" not in str(error):
+                        raise
         self.db.commit()
 
     def close(self):
@@ -121,14 +128,17 @@ class Ledger:
 
     def add(self, sha256, size, path, mark=None, source="mark", downloaded_at=None,
             host_url=None, referrer_url=None, mime=None, original_url=None, recorded_at=None,
-            name=None):
+            name=None, zone_id=None):
         """Remember one file. A mark (from marks.read) fills in
         the URLs. Returns True if this was new."""
-        zone_id = None
         if mark is not None:
             host_url = host_url or mark.host_url
             referrer_url = referrer_url or mark.referrer_url
             zone_id = mark.zone_id
+        # A link longer than this is a data: URL or similar, not a place to go
+        # back to; dropping it keeps exports importable everywhere
+        host_url, referrer_url, original_url = (u if u and len(u) <= MAX_URL else None
+                                                for u in (host_url, referrer_url, original_url))
         if not host_url and not referrer_url:
             return False        # nothing about the source worth keeping
         path = os.fspath(path)

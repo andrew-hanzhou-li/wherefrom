@@ -147,21 +147,44 @@ def launcher_command():
     return [sys.executable, "-P", "-m", "wherefrom", "native-host"]
 
 
-def write_launcher(folder, platform, cmd=None):
-    """Host manifests can't pass arguments, so they point at this script."""
+LAUNCHER_NAMES = ("wherefrom-host.bat", "wherefrom-host")
+
+
+def bat_quote(text):
+    """One argument for a .bat line: always in quotes (so & | < > ^ are
+    plain text), and % doubled (so %NAME% isn't expanded)."""
+    if '"' in text or "\n" in text or "\r" in text:
+        raise ValueError(f"can't put {text!r} in a .bat file")
+    return '"' + text.replace("%", "%%") + '"'
+
+
+def write_launcher(folder, platform, cmd=None, env=None):
+    """Host manifests can't pass arguments, so they point at this script.
+    `env` (e.g. WHEREFROM_HOME) is set in it, because a browser started from
+    the desktop doesn't have the variables of the terminal that ran setup."""
     cmd = cmd or launcher_command()
+    env = env if env is not None else wherefrom_env()
     folder.mkdir(parents=True, exist_ok=True)
     if platform == "win32":
-        path = folder / "wherefrom-host.bat"
-        quoted = " ".join(f'"{c}"' if " " in c else c for c in cmd)
+        path = folder / LAUNCHER_NAMES[0]
+        lines = ["@echo off"]
+        lines += [f'set "{name}={value.replace("%", "%%")}"' for name, value in env.items()]
+        lines.append(" ".join(bat_quote(c) for c in cmd) + " %*")
         # newline="": write the \r\n as given (text mode on Windows would
         # turn each \n into \r\n again, giving \r\r\n)
-        path.write_text(f"@echo off\r\n{quoted} %*\r\n", encoding="utf-8", newline="")
+        path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8", newline="")
     else:
-        path = folder / "wherefrom-host"
-        path.write_text("#!/bin/sh\nexec " + " ".join(shlex.quote(c) for c in cmd) + ' "$@"\n', encoding="utf-8")
+        path = folder / LAUNCHER_NAMES[1]
+        exports = "".join(f"export {name}={shlex.quote(value)}\n" for name, value in env.items())
+        path.write_text("#!/bin/sh\n" + exports + "exec " + " ".join(shlex.quote(c) for c in cmd) + ' "$@"\n',
+                        encoding="utf-8")
         path.chmod(0o755)
     return path
+
+
+def wherefrom_env():
+    """Settings the helper must share with the command line."""
+    return {"WHEREFROM_HOME": os.environ["WHEREFROM_HOME"]} if os.environ.get("WHEREFROM_HOME") else {}
 
 
 def host_manifest(kind, launcher, extra_ids=()):
@@ -192,14 +215,14 @@ def manifest_dirs(platform, home):
     return linux
 
 
-def setup(platform=None, home=None, data_home=None, registry=None, extra_ids=(), cmd=None):
+def setup(platform=None, home=None, data_home=None, registry=None, extra_ids=(), cmd=None, env=None):
     """Register the host and write the extension folders. Returns a summary
     dict: launcher, manifests, registered places, extension folders."""
     platform = platform or sys.platform
     home = Path(home or Path.home())
     data_home = Path(data_home or default_home())
     folder = data_home / "browser"
-    launcher = write_launcher(folder, platform, cmd)
+    launcher = write_launcher(folder, platform, cmd, env)
     summary = {"launcher": launcher, "manifests": {}, "registered": [], "extensions": {}}
     for kind in ("chromium", "firefox"):
         manifest_path = folder / f"{HOST_NAME}.{kind}.json"
@@ -213,9 +236,15 @@ def setup(platform=None, home=None, data_home=None, registry=None, extra_ids=(),
                 summary["registered"].append(f"HKCU\\{key}\\{HOST_NAME}")
         else:
             for directory in manifest_dirs(platform, home)[kind]:
-                # Only where that browser is installed (its folder exists)
-                if not directory.parent.is_dir():
+                # Only where that browser is installed (its folder exists).
+                # Firefox on macOS reads hosts from .../Mozilla but keeps its
+                # profiles in .../Firefox, so that's the folder that shows it.
+                installed = directory.parent
+                if platform == "darwin" and kind == "firefox":
+                    installed = directory.parent.parent / "Firefox"
+                if not installed.is_dir():
                     continue
+                directory.parent.mkdir(exist_ok=True)
                 directory.mkdir(exist_ok=True)
                 target = directory / f"{HOST_NAME}.json"
                 shutil.copyfile(manifest_path, target)
@@ -246,10 +275,21 @@ def remove(platform=None, home=None, data_home=None, registry=None):
                         removed.append(str(target))
                 except (OSError, ValueError):
                     pass
+    # Only the files setup wrote, so nothing else in this folder is touched
     folder = data_home / "browser"
-    if folder.is_dir():
-        shutil.rmtree(folder)
-        removed.append(str(folder))
+    owned = [folder / name for name in LAUNCHER_NAMES]
+    owned += [folder / f"{HOST_NAME}.{kind}.json" for kind in ("chromium", "firefox")]
+    for kind in ("chromium", "firefox"):
+        owned += [folder / f"extension-{kind}" / name for name in ("manifest.json", "background.js")]
+    for path in owned:
+        if path.is_file() and not path.is_symlink():
+            path.unlink()
+            removed.append(str(path))
+    for empty in (folder / "extension-chromium", folder / "extension-firefox", folder):
+        try:
+            empty.rmdir()               # only if nothing else is in it
+        except OSError:
+            pass
     return removed
 
 

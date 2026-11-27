@@ -25,7 +25,7 @@ VERSION = 1
 
 MAX_SIDECAR_BYTES = 64 * 1024
 MAX_EXPORT_BYTES = 200 * 1024 * 1024
-MAX_TEXT = 8192                     # longest URL, name or path accepted
+MAX_TEXT = 8192                     # longest URL, name or path accepted (same as the ledger's)
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 TEXT_FIELDS = ("name", "path", "host_url", "referrer_url", "source", "downloaded_at",
                "recorded_at", "mime", "original_url")
@@ -102,10 +102,13 @@ def import_file(ledger, source_file):
     try:
         with open(source_file, encoding="utf-8") as f:
             data = json.load(f)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (ValueError, RecursionError) as error:
+        # ValueError covers bad JSON, bad UTF-8 and numbers too long to read
         raise BadFile(f"not a wherefrom export ({error})") from error
     if not isinstance(data, dict) or data.get("format") != EXPORT_FORMAT:
         raise BadFile("not a wherefrom export")
+    if not isinstance(data.get("records", []), list):
+        raise BadFile("damaged: its records aren't a list")
     if not isinstance(data.get("version"), int) or data["version"] > VERSION:
         raise BadFile("made by a newer wherefrom; update to import it")
     new = invalid = 0
@@ -114,10 +117,10 @@ def import_file(ledger, source_file):
         if clean is None:
             invalid += 1
             continue
-        # Keep the original source and dates: it was e.g. Chrome's history
-        # on the other computer; the import itself is only the transport.
+        # Always marked as imported: the file says where it was learned, but
+        # whoever wrote it could claim anything ("your Chrome history").
         if ledger.add(clean["sha256"], clean["size"], clean["path"] or clean["name"] or "?",
-                      source=clean["source"] or "import", downloaded_at=clean["downloaded_at"],
+                      source="import", downloaded_at=clean["downloaded_at"], zone_id=clean["zone_id"],
                       host_url=clean["host_url"], referrer_url=clean["referrer_url"],
                       mime=clean["mime"], original_url=clean["original_url"],
                       recorded_at=clean["recorded_at"], name=clean["name"]):
@@ -136,7 +139,11 @@ def write_sidecar(path, record):
     data = {"format": SIDECAR_FORMAT, "version": VERSION, **record_to_dict(record)}
     data["path"] = None             # where it was on this computer means nothing elsewhere
     target = sidecar_path(path)
-    with open(target, "w", encoding="utf-8") as f:
+    if target.is_symlink():
+        # Never write through a link someone placed under this name
+        raise OSError(f"{target} is a link; not writing through it")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0)
+    with os.fdopen(os.open(target, flags, 0o644), "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=1)
     return target
 
@@ -148,7 +155,8 @@ def read_sidecar(sidecar):
             return None
         with open(sidecar, encoding="utf-8") as f:
             data = json.load(f)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+    except (OSError, ValueError, RecursionError):
+        # Anything odd in someone else's file means "no sidecar", never a crash
         return None
     if not isinstance(data, dict) or data.get("format") != SIDECAR_FORMAT:
         return None
@@ -192,5 +200,8 @@ def make_sidecars(ledger, paths):
         if not records:
             unknown.append(path)
             continue
-        written.append(write_sidecar(path, records[0]))
+        try:
+            written.append(write_sidecar(path, records[0]))
+        except OSError:
+            unknown.append(path)        # e.g. a link sits where the sidecar would go
     return written, unknown

@@ -63,8 +63,8 @@ It sends only finished downloads to wherefrom on your own computer, never anythi
 
 ## Taking records with you
 
-- **A new computer:** `wherefrom export records.json` on the old one, `wherefrom import records.json` on the new one. Each record keeps where it was learned and when. Importing twice does nothing more.
-- **One file, for someone else:** `wherefrom sidecar report.pdf` writes `report.pdf.wherefrom.json`. Keep the two together; wherefrom on any computer then shows the source, even if the file is renamed. A sidecar is tied to the file's fingerprint, so it never applies to different contents. Remember that a sidecar is only as trustworthy as whoever gave it to you: wherefrom says when a source came from one.
+- **A new computer:** `wherefrom export records.json` on the old one, `wherefrom import records.json` on the new one. Each record keeps its links and dates, and is shown as "from an imported export" (a file from someone else could claim anything). Importing twice does nothing more.
+- **One file, for someone else:** `wherefrom sidecar report.pdf` writes `report.pdf.wherefrom.json`. Keep the two together; wherefrom on any computer then shows the source, even if the file is renamed. A sidecar is tied to the file's fingerprint, so it never applies to different contents. A sidecar is only as trustworthy as whoever gave it to you: wherefrom says when a source came from one, and never lets a sidecar or an import outrank what your own computer recorded.
 
 ## How it works
 
@@ -73,7 +73,7 @@ It sends only finished downloads to wherefrom on your own computer, never anythi
 - **The extension:** the browser starts wherefrom's small "native messaging" helper for each finished download and passes it one message. Browsers only let the extension named in the helper's registration talk to it.
 - **Looking up:** `show` reads the file's own note and any sidecar next to it, then looks its fingerprint up in the database.
 
-The database is `ledger.sqlite3` in `%LOCALAPPDATA%\wherefrom` (Windows), `~/Library/Application Support/wherefrom` (macOS) or `~/.local/share/wherefrom` (Linux), or in the folder named by `WHEREFROM_HOME`.
+The database is `ledger.sqlite3` in `%LOCALAPPDATA%\wherefrom` (Windows), `~/Library/Application Support/wherefrom` (macOS) or `~/.local/share/wherefrom` (Linux), or in the folder named by `WHEREFROM_HOME`. If you use `WHEREFROM_HOME`, set it before `install` and `browser setup` so what they start uses it too; on Windows, set it as a user environment variable (Explorer's menu entry reads it from there).
 
 ## Privacy
 

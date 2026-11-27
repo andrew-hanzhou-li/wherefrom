@@ -53,7 +53,8 @@ def test_a_real_download_reaches_the_ledger(tmp_path):
     (home / ".config" / "chromium").mkdir(parents=True)
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     summary = native.setup("linux" if sys.platform.startswith("linux") else sys.platform, home, data,
-                           cmd=[sys.executable, "-P", "-m", "wherefrom", "native-host"])
+                           cmd=[sys.executable, "-P", "-m", "wherefrom", "native-host"],
+                           env={"WHEREFROM_HOME": str(data)})
     # A browser run with --user-data-dir looks for hosts in that folder too
     (profile / "NativeMessagingHosts").mkdir(parents=True)
     (profile / "NativeMessagingHosts" / f"{native.HOST_NAME}.json").write_text(

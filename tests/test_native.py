@@ -133,13 +133,13 @@ def test_mac_setup(tmp_path):
 
 def test_windows_setup_with_a_fake_registry(tmp_path):
     reg = FakeRegistry()
-    summary = native.setup("win32", tmp_path, tmp_path / "data", registry=reg,
+    summary = native.setup("win32", tmp_path, tmp_path / "data", registry=reg, env={},
                            cmd=["C:\\Program Files\\Python\\python.exe", "-P", "-m", "wherefrom", "native-host"])
     key = native.WINDOWS_KEYS["chromium"][0] + "\\" + native.HOST_NAME
     assert reg.values[(key, "")] == str(summary["manifests"]["chromium"])
     assert reg.values[(native.WINDOWS_KEYS["firefox"][0] + "\\" + native.HOST_NAME, "")] == str(summary["manifests"]["firefox"])
     bat = summary["launcher"].read_bytes()            # bytes: the \r\n must be exact
-    assert bat == b'@echo off\r\n"C:\\Program Files\\Python\\python.exe" -P -m wherefrom native-host %*\r\n'
+    assert bat == (b'@echo off\r\n"C:\\Program Files\\Python\\python.exe" "-P" "-m" "wherefrom" "native-host" %*\r\n')
     native.remove("win32", tmp_path, tmp_path / "data", registry=reg)
     assert reg.values == {}
 
@@ -165,3 +165,40 @@ def test_the_real_command_speaks_the_protocol(tmp_path):
                             input=framed(download(f)), capture_output=True, env=env, cwd=tmp_path)
     assert result.returncode == 0, result.stderr
     assert replies(result.stdout) == [{"ok": True, "new": True}]
+
+
+def test_bat_launcher_keeps_odd_paths_literal(tmp_path):
+    bat = native.write_launcher(tmp_path, "win32", cmd=["C:\\Users\\Tom&Jerry\\100%PATH%\\python.exe", "-P"],
+                                env={"WHEREFROM_HOME": "D:\\50% done"})
+    text = bat.read_bytes().decode()
+    assert '"C:\\Users\\Tom&Jerry\\100%%PATH%%\\python.exe" "-P" %*' in text       # & quoted, % doubled
+    assert 'set "WHEREFROM_HOME=D:\\50%% done"' in text
+    with pytest.raises(ValueError):
+        native.bat_quote('a"b')
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX launcher")
+def test_the_launcher_carries_wherefrom_home(tmp_path):
+    launcher = native.write_launcher(tmp_path, sys.platform, env={"WHEREFROM_HOME": "/data/my ledger"},
+                                     cmd=[sys.executable, "-c", "import os; print(os.environ['WHEREFROM_HOME'])"])
+    out = subprocess.run([str(launcher)], capture_output=True, text=True, check=True, env={"PATH": os.environ["PATH"]})
+    assert out.stdout.strip() == "/data/my ledger"
+
+
+def test_remove_leaves_other_files_alone(tmp_path):
+    home, data = tmp_path / "home", tmp_path / "data"
+    (home / ".config" / "google-chrome").mkdir(parents=True)
+    native.setup("linux", home, data, cmd=["/usr/bin/python3"], env={})
+    mine = data / "browser" / "notes.txt"
+    mine.write_text("not wherefrom's")
+    native.remove("linux", home, data)
+    assert mine.read_text() == "not wherefrom's"
+    assert sorted(p.name for p in (data / "browser").iterdir()) == ["notes.txt"]
+
+
+def test_firefox_on_mac_is_found_by_its_profile_folder(tmp_path):
+    home = tmp_path / "home"
+    (home / "Library" / "Application Support" / "Firefox").mkdir(parents=True)     # no Mozilla folder yet
+    summary = native.setup("darwin", home, tmp_path / "data", cmd=["/usr/bin/python3"], env={})
+    expected = home / "Library" / "Application Support" / "Mozilla" / "NativeMessagingHosts" / f"{native.HOST_NAME}.json"
+    assert summary["registered"] == [str(expected)] and expected.is_file()

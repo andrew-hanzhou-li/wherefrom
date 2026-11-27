@@ -29,7 +29,7 @@ def test_install_adds_the_menu_entry():
     shell.install(reg)
     assert reg.values[(shell.MENU_KEY, "")] == "Where did this come from?"
     command = reg.values[(shell.MENU_KEY + r"\command", "")]
-    assert command.endswith(' show --gui "%1"')     # quoted: paths can have spaces
+    assert command.endswith(' show --gui -- "%1"')  # quoted: paths can have spaces; --: never an option
     assert command.startswith('"')
     if not getattr(__import__("sys"), "frozen", False):
         assert " -P -m wherefrom " in command      # never imports from the clicked file's folder

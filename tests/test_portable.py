@@ -29,8 +29,9 @@ def test_export_and_import_to_a_new_computer(tmp_path, ledger):
     assert portable.import_file(new_pc, tmp_path / "out.json") == (1, 0)
     assert portable.import_file(new_pc, tmp_path / "out.json") == (0, 0)      # twice is harmless
     [record] = new_pc.by_hash(sha)
+    # Marked as imported, whatever the file says it was learned from
     assert (record.source, record.downloaded_at, record.mime, record.original_url) == \
-        ("chrome", "2026-10-02T21:14:00", "application/pdf", "https://short.test/r")
+        ("import", "2026-10-02T21:14:00", "application/pdf", "https://short.test/r")
     # The copied file on the new computer is traced by its contents
     copy = make_download(tmp_path / "new pc", "renamed.pdf")
     assert lookup.look_up(copy, new_pc, read_mark=FakeMarks()).host_url == "https://cdn.test/report.pdf"
@@ -140,3 +141,89 @@ def test_cli_export_import_and_sidecar(tmp_path, capsys, monkeypatch):
     other = make_download(tmp_path / "d", "unknown.bin", b"never seen")
     assert cli.main(["sidecar", str(other)]) == 1
     assert "No record" in capsys.readouterr().err
+
+
+def test_a_malicious_sidecar_cannot_break_the_folder(tmp_path, ledger):
+    f = make_download(tmp_path, "a.pdf", b"x")
+    (tmp_path / "evil.wherefrom.json").write_text('{"format": "wherefrom-sidecar", "size": ' + "9" * 5000 + "}")
+    (tmp_path / "deep.wherefrom.json").write_text("[" * 100000)
+    assert not lookup.look_up(f, ledger, read_mark=FakeMarks()).known       # no crash
+
+
+def test_imports_with_odd_shapes_are_refused_cleanly(tmp_path, ledger):
+    for content in ('{"format": "wherefrom-ledger", "version": 1, "records": 5}',
+                    '{"format": "wherefrom-ledger", "version": 1, "x": ' + "9" * 5000 + "}",
+                    "[" * 100000):
+        (tmp_path / "x.json").write_text(content)
+        with pytest.raises(portable.BadFile):
+            portable.import_file(ledger, tmp_path / "x.json")
+
+
+def test_a_sidecar_cannot_take_over_the_headline(tmp_path, ledger):
+    f = make_download(tmp_path, "setup.exe", b"installer")
+    sha, size = file_hash(f)
+    ledger.add(sha, size, f, source="chrome", downloaded_at="2026-11-20T10:00:00",
+               host_url="https://evil.example/setup.exe", referrer_url="https://evil.example/")
+    fake = {"format": portable.SIDECAR_FORMAT, "version": 1, "sha256": sha, "size": size, "name": "setup.exe",
+            "host_url": "https://download.microsoft.com/setup.exe", "downloaded_at": "2001-01-01T00:00:00"}
+    (tmp_path / "x.wherefrom.json").write_text(json.dumps(fake))
+    finding = lookup.look_up(f, ledger, read_mark=FakeMarks())
+    assert finding.host_url == "https://evil.example/setup.exe"         # what this computer saw
+    assert finding.first.source == "chrome"
+    assert [r.source for r in finding.records] == ["chrome", "sidecar"]
+
+
+def test_long_urls_are_dropped_not_fatal_and_zone_survives(tmp_path, ledger):
+    f = make_download(tmp_path, "a.bin", b"a")
+    sha, size = file_hash(f)
+    ledger.add(sha, size, f, source="chrome", host_url="data:application/octet-stream;base64," + "A" * 20000,
+               referrer_url="https://site.test/page")
+    g = make_download(tmp_path, "b.bin", b"b")
+    ledger.add(*file_hash(g), g, source="mark", host_url="https://x.test/b", zone_id=3)
+    portable.export(ledger, tmp_path / "out.json")
+    other = Ledger(tmp_path / "other.sqlite3")
+    assert portable.import_file(other, tmp_path / "out.json") == (2, 0)
+    assert {r.host_url: r.zone_id for r in other.all_records()} == {None: None, "https://x.test/b": 3}
+    other.close()
+
+
+def test_sidecars_are_not_written_through_links(tmp_path, ledger):
+    import os
+    if not hasattr(os, "symlink"):
+        pytest.skip("no symlinks")
+    f = make_download(tmp_path, "a.pdf", b"x")
+    victim = tmp_path / "victim.txt"
+    victim.write_text("keep me")
+    try:
+        os.symlink(victim, portable.sidecar_path(f))
+    except OSError:
+        pytest.skip("can't make symlinks here")
+    lookup.look_up(f, ledger, read_mark=FakeMarks({"a.pdf": web_mark()}))
+    assert portable.make_sidecars(ledger, [f]) == ([], [f])
+    assert victim.read_text() == "keep me"
+
+
+def test_two_processes_upgrading_an_old_ledger_at_once(tmp_path, monkeypatch):
+    # Process A checks the columns, process B adds "mime" first, then A's
+    # ALTER TABLE fails with "duplicate column name": that must be harmless.
+    import sqlite3
+    from wherefrom import ledger as ledger_module
+    path = tmp_path / "old.sqlite3"
+    Ledger(path).close()                       # a ledger that already has every column
+
+    class StaleCheck:
+        """A connection whose column check still sees the old table."""
+        def __init__(self, conn):
+            self.conn = conn
+
+        def execute(self, sql, *args):
+            if sql.startswith("PRAGMA table_info"):
+                return [r for r in self.conn.execute(sql) if r[1] not in ledger_module.ADDED_COLUMNS]
+            return self.conn.execute(sql, *args)
+
+        def __getattr__(self, name):
+            return getattr(self.conn, name)
+
+    real_connect = sqlite3.connect
+    monkeypatch.setattr(ledger_module.sqlite3, "connect", lambda *a, **k: StaleCheck(real_connect(*a, **k)))
+    Ledger(path).close()                       # tries ALTER TABLE on existing columns: no error
