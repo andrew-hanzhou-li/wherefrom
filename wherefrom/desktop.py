@@ -162,7 +162,8 @@ def uninstall(platform, home, run=subprocess.run):
         except OSError:
             continue
         if platform == "darwin":
-            run(["launchctl", "bootout", f"gui/{os.getuid()}", str(path)],  # nosec B603 B607
+            uid = os.getuid() if hasattr(os, "getuid") else 0      # (tests simulate macOS elsewhere)
+            run(["launchctl", "bootout", f"gui/{uid}", str(path)],  # nosec B603 B607
                 capture_output=True, check=False)
         path.unlink()
         removed.append(path)
