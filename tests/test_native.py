@@ -119,6 +119,13 @@ def test_linux_setup_and_remove(tmp_path):
     assert json.loads(chrome_manifest.read_text())["path"] == str(summary["launcher"])
     assert (summary["extensions"]["chromium"] / "manifest.json").is_file()
     assert (summary["extensions"]["firefox"] / "background.js").is_file()
+    # Every file a manifest names is there, or the browser refuses to load it
+    for kind in ("chromium", "firefox"):
+        folder = summary["extensions"][kind]
+        manifest = json.loads((folder / "manifest.json").read_text())
+        for name in [*manifest["icons"].values(), *manifest["background"].get("scripts", []),
+                     manifest["background"].get("service_worker", "background.js")]:
+            assert (folder / name).is_file(), (kind, name)
     removed = native.remove("linux", home, data)
     assert str(chrome_manifest) in removed and not chrome_manifest.exists() and not (data / "browser").exists()
 
