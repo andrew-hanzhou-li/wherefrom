@@ -89,6 +89,12 @@ def cmd_scan(args, ledger):
     return 0
 
 
+def cmd_app(args, ledger):
+    from . import app
+    app.run(ledger)
+    return 0
+
+
 def cmd_export(args, ledger):
     count = portable.export(ledger, args.file)
     print(f"Wrote {count} record(s) to {args.file}. On another computer: wherefrom import {args.file}")
@@ -193,6 +199,9 @@ def build_parser():
                                  help="also write a .wherefrom.json next to each new file, so its "
                                       "source travels with it")
         command.set_defaults(run=run)
+
+    window = sub.add_parser("app", help="a window to browse and search everything recorded")
+    window.set_defaults(run=cmd_app)
 
     export = sub.add_parser("export", help="save every record to a file, e.g. for a new computer")
     export.add_argument("file")
