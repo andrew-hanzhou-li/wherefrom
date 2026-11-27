@@ -1,6 +1,8 @@
 # wherefrom
 
-Right-click any file in Explorer and see where it came from: the link it was downloaded from, the page that link was on, and when, even if the file has since been renamed, moved, or copied to a USB stick.
+Right-click any file and see where it came from: the link it was downloaded from, the page that link was on, and when. It still works after the file has been renamed, moved, or copied to a USB stick or another computer.
+
+Works on Windows, macOS and Linux.
 
 ```
 > wherefrom show "D:\Backup\final version.pdf"
@@ -14,58 +16,78 @@ D:\Backup\final version.pdf
 
 ## Why
 
-When a browser saves a file, Windows attaches a hidden note to it (the "Mark of the Web", in a stream called `Zone.Identifier`) with the address it came from. But Windows never shows it, and it's easy to lose: copying the file to a USB stick, a FAT drive, many cloud folders or an email drops it. The browser remembers too, until you clear your history.
+When a browser saves a file, the system attaches a hidden note with the address it came from: the "Mark of the Web" on Windows, "Where from" on macOS, `user.xdg.origin.url` on Linux (from Chrome). It's rarely shown and easy to lose: copying the file to a USB stick, a FAT drive, many cloud folders or an email drops it. The browser remembers too, until you clear your history.
 
 wherefrom keeps that information in a small database of its own, next to a fingerprint (SHA-256) of each file's contents. Any later copy with the same contents, under any name and in any folder, can be traced back.
 
 ## Install
 
-Download `wherefrom.exe` and `wherefromw.exe` from the latest CI run's artifacts, put them in a folder of your choice (for example `%LOCALAPPDATA%\Programs\wherefrom`), and run there:
+**Windows:** download `wherefrom.exe` and `wherefromw.exe` from the latest CI run's artifacts (Actions → latest run → `wherefrom-windows`), put them in a folder such as `%LOCALAPPDATA%\Programs\wherefrom`, and run there:
 
 ```
 wherefrom install --autostart
 wherefrom import-browsers
 ```
 
-Or, with Python 3.11 or later: `pip install .` in this folder, then the same two commands.
+**Any system, with Python 3.11 or later:** `pip install .` in this folder, then the same two commands.
 
-- `install` adds **Where did this come from?** to the right-click menu of every file (on Windows 11 it's under **Show more options**). With `--autostart` the watcher also starts when you sign in.
-- `import-browsers` reads the download history of Chrome, Edge, Brave, Vivaldi and Firefox, so files you downloaded before installing are covered too.
+- `install` adds **Where did this come from?** to the right-click menu of every file: Explorer on Windows (on Windows 11 under **Show more options**), GNOME Files (under **Scripts**) and KDE Dolphin on Linux. macOS has no Finder entry; use `wherefrom show` or the window (`wherefrom app`). With `--autostart` the watcher also starts when you sign in.
+- `import-browsers` reads the download history of Chrome, Edge, Brave, Vivaldi, Chromium and Firefox, so files you downloaded before installing are covered too.
 
 Nothing needs admin rights: everything is per user.
+
+### Optional: the browser extension
+
+The extension records every download the moment it finishes, with the final link after redirects, the link first clicked, the page and the file type. It also covers programs and settings where the browser leaves no download note on the file.
+
+1. Run `wherefrom browser setup`. It connects wherefrom to every browser installed for your user and prints a folder.
+2. **Chrome, Edge, Brave, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick that folder.
+3. **Firefox:** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick the printed `manifest.json`. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
+
+It sends only finished downloads to wherefrom on your own computer, never anything about the pages you visit, and nothing from private or incognito windows. `wherefrom browser remove` undoes the setup.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `wherefrom show FILE` | Where a file came from (`--gui` for the window the menu opens) |
+| `wherefrom show FILE` | Where a file came from (`--gui` for the small window the menu opens) |
+| `wherefrom app` | A window to browse and search everything recorded |
 | `wherefrom search TEXT` | Files from a site or URL, or with a name, e.g. `wherefrom search canvas` |
-| `wherefrom watch` | Keep recording new files in Downloads (`--folder` to add others) |
+| `wherefrom watch` | Keep recording new files in Downloads (`--folder` to add others, `--sidecars` to write sidecar files) |
 | `wherefrom scan` | Record what's in Downloads once, without staying open |
 | `wherefrom import-browsers` | Add your browsers' download history |
+| `wherefrom export FILE` / `import FILE` | Move every record to another computer |
+| `wherefrom sidecar FILE...` | Write `FILE.wherefrom.json` so the source travels with the file |
+| `wherefrom browser setup` / `remove` | Connect (or disconnect) the browser extension |
 | `wherefrom install` / `uninstall` | Add or remove the menu entry (and start at login) |
+
+## Taking records with you
+
+- **A new computer:** `wherefrom export records.json` on the old one, `wherefrom import records.json` on the new one. Each record keeps where it was learned and when. Importing twice does nothing more.
+- **One file, for someone else:** `wherefrom sidecar report.pdf` writes `report.pdf.wherefrom.json`. Keep the two together; wherefrom on any computer then shows the source, even if the file is renamed. A sidecar is tied to the file's fingerprint, so it never applies to different contents. Remember that a sidecar is only as trustworthy as whoever gave it to you: wherefrom says when a source came from one.
 
 ## How it works
 
-- **Watching:** every 5 seconds the watcher lists Downloads. A file that looks the same twice in a row is finished downloading; if it has a Mark of the Web, its source and fingerprint go into the database. Unfinished downloads (`.crdownload`, `.part`, ...) are skipped, and files already looked at aren't read again.
+- **Watching:** every 5 seconds the watcher lists Downloads (wherever you moved it). A file that looks the same twice in a row is finished downloading; if it has a download note, its source and fingerprint go into the database. Unfinished downloads (`.crdownload`, `.part`, ...) are skipped, and files already looked at aren't read again.
 - **Browser history:** each browser's history database is copied and the copy is read. The browser's own files are never opened or changed. Only downloads whose files still exist are recorded, since a file has to be read to be fingerprinted.
-- **Looking up:** `show` reads the file's own mark first, then looks its fingerprint up in the database.
+- **The extension:** the browser starts wherefrom's small "native messaging" helper for each finished download and passes it one message. Browsers only let the extension named in the helper's registration talk to it.
+- **Looking up:** `show` reads the file's own note and any sidecar next to it, then looks its fingerprint up in the database.
 
-The database is `%LOCALAPPDATA%\wherefrom\ledger.sqlite3` (or the folder in `WHEREFROM_HOME`).
+The database is `ledger.sqlite3` in `%LOCALAPPDATA%\wherefrom` (Windows), `~/Library/Application Support/wherefrom` (macOS) or `~/.local/share/wherefrom` (Linux), or in the folder named by `WHEREFROM_HOME`.
 
 ## Privacy
 
-Everything stays on your computer. wherefrom makes no network connections. The **Open page** button in the window only opens `http` and `https` links, in your normal browser.
+Everything stays on your computer. wherefrom makes no network connections. The **Open page** button only opens `http` and `https` links, in your normal browser.
 
 ## Limits
 
-- It only knows what a browser recorded. Files from programs that don't write a Mark of the Web, and that weren't in a browser's history, can't be traced.
+- It only knows what a browser (or its extension) recorded. Files from programs that leave no download note, and that weren't in a browser's history, can't be traced.
 - A file that was edited after downloading has a new fingerprint, so copies of the edited version aren't matched to the original download.
-- Explorer only shows the menu for files, not folders.
+- Explorer and the Linux file managers only show the menu for files, not folders.
 
 ## Uninstall
 
-`wherefrom uninstall` removes the menu entry and the start-at-login entry. Then delete the program and, if you like, the database folder.
+`wherefrom uninstall` removes the menu entry and the start-at-login entry, and `wherefrom browser remove` the extension's connection (remove the extension itself in the browser). Then delete the program and, if you like, the database folder.
 
 ## Development
 
@@ -74,7 +96,7 @@ pip install pytest
 python -m pytest
 ```
 
-Tests that need Windows (real `Zone.Identifier` streams, the registry, the window) run in CI on `windows-latest`.
+Some tests need a particular system (Windows streams and registry, macOS attributes) or a display; they run in CI on Windows, macOS and Linux. `tests/test_extension_e2e.py` drives a real Chromium with the extension loaded (it needs Python Playwright and a display).
 
 ## License
 
