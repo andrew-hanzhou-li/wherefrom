@@ -22,7 +22,7 @@ wherefrom keeps that information in a small database of its own, next to a finge
 
 ## Install
 
-**Windows:** download `wherefrom.exe` and `wherefromw.exe` from the latest CI run's artifacts (Actions → latest run → `wherefrom-windows`), put them in a folder such as `%LOCALAPPDATA%\Programs\wherefrom`, and run there:
+**Windows:** download `wherefrom.exe` and `wherefromw.exe` from the [latest release](https://github.com/andrew-hanzhou-li/wherefrom/releases/latest), put them in a folder such as `%LOCALAPPDATA%\Programs\wherefrom`, and run there:
 
 ```
 wherefrom install --autostart
@@ -34,7 +34,7 @@ wherefrom import-browsers
 - `install` adds **Where did this come from?** to the right-click menu of every file: Explorer on Windows (on Windows 11 under **Show more options**), GNOME Files (under **Scripts**) and KDE Dolphin on Linux. macOS has no Finder entry; use `wherefrom show` or the window (`wherefrom app`). With `--autostart` the watcher also starts when you sign in.
 - `import-browsers` reads the download history of Chrome, Edge, Brave, Vivaldi, Chromium and Firefox, so files you downloaded before installing are covered too.
 
-Nothing needs admin rights: everything is per user.
+Nothing needs admin rights: everything is per user. The programs aren't code-signed yet, so Windows SmartScreen may warn about an unknown publisher the first time; `SHA256SUMS.txt` in the release lets you check the download.
 
 ### Optional: the browser extension
 
@@ -44,7 +44,9 @@ The extension records every download the moment it finishes, with the final link
 2. **Chrome, Edge, Brave, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick that folder.
 3. **Firefox:** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick the printed `manifest.json`. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
 
-It sends only finished downloads to wherefrom on your own computer, never anything about the pages you visit, and nothing from private or incognito windows. `wherefrom browser remove` undoes the setup.
+It sends only finished downloads to wherefrom on your own computer, never anything about the pages you visit, and nothing from private or incognito windows. `wherefrom browser remove` undoes the setup. See [PRIVACY.md](PRIVACY.md).
+
+Store versions (Chrome Web Store, Edge Add-ons, Firefox Add-ons) are on the way; they'll replace steps 2 and 3. `wherefrom browser setup` still has to run once, since the extension only talks to wherefrom on your computer.
 
 ## Commands
 
@@ -96,7 +98,16 @@ pip install pytest
 python -m pytest
 ```
 
+`python packaging/build_extension.py` builds the extension's store packages into `dist/extension`; `python packaging/make_icons.py` redraws its icons (needs Pillow).
+
 Some tests need a particular system (Windows streams and registry, macOS attributes) or a display; they run in CI on Windows, macOS and Linux. `tests/test_extension_e2e.py` drives a real Chromium with the extension loaded (it needs Python Playwright and a display).
+
+## Releasing
+
+1. Put the new version in `pyproject.toml`, `wherefrom/__init__.py` and both `wherefrom/extension/manifest_*.json` (a test checks they match).
+2. Merge to `main`, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`.
+3. CI tests, builds and publishes a GitHub Release with `wherefrom.exe`, `wherefromw.exe`, the two store packages and `SHA256SUMS.txt`. It refuses a tag that doesn't match the version.
+4. Upload the store packages to the stores (see [docs/store-listing.md](docs/store-listing.md)).
 
 ## License
 

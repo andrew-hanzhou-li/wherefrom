@@ -30,8 +30,14 @@ from .watch import file_hash
 HOST_NAME = "com.wherefrom.host"
 CHROMIUM_ID = "oihchieldoakdhphjlofnphcpmmiooka"       # fixed by the manifest's public key
 FIREFOX_ID = "wherefrom@andrew-hanzhou-li.github.io"
+# The IDs the Chrome Web Store and Edge Add-ons give the published extension.
+# They differ from CHROMIUM_ID because store packages carry no "key".
+STORE_IDS = ()
 MAX_MESSAGE = 1024 * 1024
 MAX_TEXT = 8192
+# The extension's files besides its manifest, which differs per browser family
+EXTENSION_ICONS = tuple(f"icons/icon-{size}.png" for size in (16, 32, 48, 128))
+EXTENSION_FILES = ("background.js", *EXTENSION_ICONS)
 
 # Where Chromium browsers look for host manifests, per system
 WINDOWS_KEYS = {
@@ -193,15 +199,16 @@ def host_manifest(kind, launcher, extra_ids=()):
     if kind == "firefox":
         manifest["allowed_extensions"] = [FIREFOX_ID]
     else:
-        manifest["allowed_origins"] = [f"chrome-extension://{i}/" for i in (CHROMIUM_ID, *extra_ids)]
+        manifest["allowed_origins"] = [f"chrome-extension://{i}/" for i in (CHROMIUM_ID, *STORE_IDS, *extra_ids)]
     return manifest
 
 
 def copy_extension(target, kind):
     """The unpacked extension for one browser family, ready to load."""
-    target.mkdir(parents=True, exist_ok=True)
     package = resources.files("wherefrom") / "extension"
-    (target / "background.js").write_bytes((package / "background.js").read_bytes())
+    for name in EXTENSION_FILES:
+        (target / name).parent.mkdir(parents=True, exist_ok=True)
+        (target / name).write_bytes(package.joinpath(*name.split("/")).read_bytes())
     (target / "manifest.json").write_bytes((package / f"manifest_{kind}.json").read_bytes())
     return target
 
@@ -280,12 +287,13 @@ def remove(platform=None, home=None, data_home=None, registry=None):
     owned = [folder / name for name in LAUNCHER_NAMES]
     owned += [folder / f"{HOST_NAME}.{kind}.json" for kind in ("chromium", "firefox")]
     for kind in ("chromium", "firefox"):
-        owned += [folder / f"extension-{kind}" / name for name in ("manifest.json", "background.js")]
+        owned += [folder / f"extension-{kind}" / name for name in ("manifest.json", *EXTENSION_FILES)]
     for path in owned:
         if path.is_file() and not path.is_symlink():
             path.unlink()
             removed.append(str(path))
-    for empty in (folder / "extension-chromium", folder / "extension-firefox", folder):
+    extension_dirs = [folder / f"extension-{kind}" for kind in ("chromium", "firefox")]
+    for empty in (*[d / "icons" for d in extension_dirs], *extension_dirs, folder):
         try:
             empty.rmdir()               # only if nothing else is in it
         except OSError:
