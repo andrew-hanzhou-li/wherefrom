@@ -1,0 +1,42 @@
+name: Something doesn't work
+description: wherefrom shows the wrong source, misses a file, or fails to install or start
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead. Error messages help a lot.
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: System
+      options: [Windows 11, Windows 10, macOS, Linux, Other]
+    validations:
+      required: true
+  - type: dropdown
+    id: installed
+    attributes:
+      label: How you installed it
+      options: [wherefrom-setup.exe, winget, pipx or uv, The .exe files on their own, From source]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown by `wherefrom --version`, or in Settings > Apps on Windows
+      placeholder: "0.3.0"
+  - type: input
+    id: browser
+    attributes:
+      label: Browser the file came from (if it's about a download)
+      placeholder: Chrome, Edge, Brave, Firefox...
+  - type: textarea
+    id: log
+    attributes:
+      label: Setup log (if it's about installing)
+      description: On Windows, the contents of %LOCALAPPDATA%\Programs\wherefrom\setup.log. Remove anything private first.
+      render: text
