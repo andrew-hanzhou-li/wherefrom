@@ -68,9 +68,12 @@ jobs:
 
   build:
     # The two .exe files: wherefrom.exe for the command line, wherefromw.exe
-    # (no console window) for the right-click menu and start at login.
+    # (no console window) for the right-click menu and start at login. Plus
+    # wherefrom-setup.exe, the installer, which is installed, upgraded and
+    # uninstalled for real on this machine.
     needs: test
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -83,8 +86,8 @@ jobs:
         run: |
           pip install pyinstaller==6.22.3
           # The browser extension's files travel inside the programs
-          pyinstaller --onefile --name wherefrom --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
-          pyinstaller --onefile --noconsole --name wherefromw --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
+          pyinstaller --onefile --icon packaging/wherefrom.ico --name wherefrom --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
+          pyinstaller --onefile --noconsole --icon packaging/wherefrom.ico --name wherefromw --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
 
       - name: Check the built program
         shell: pwsh
@@ -109,12 +112,88 @@ jobs:
           if ($out -notmatch "https://example.com/report.pdf") { throw "the copy wasn't traced" }
           Write-Output "::notice::Built wherefrom.exe; it read a real Mark of the Web and traced a renamed copy"
 
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          function Find-Iscc { Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup*\ISCC.exe", "$env:ProgramFiles\Inno Setup*\ISCC.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 }
+          $iscc = Find-Iscc
+          if (-not $iscc) {
+            choco install innosetup -y --no-progress
+            $iscc = Find-Iscc
+          }
+          if (-not $iscc) { throw "Inno Setup's compiler (ISCC.exe) wasn't found" }
+          Write-Output "Using $($iscc.FullName)"
+          $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
+          & $iscc.FullName "/DAppVersion=$version" "/DDistDir=$PWD\dist" "/O$PWD\dist" packaging\wherefrom.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+
+      - name: Install, upgrade and uninstall it
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $app = "$env:LOCALAPPDATA\Programs\wherefrom"
+          $menu = "HKCU:\Software\Classes\*\shell\wherefrom\command"
+          $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+          $hostKey = "HKCU:\Software\Google\Chrome\NativeMessagingHosts\com.wherefrom.host"
+          $entry = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{7C3BDB2F-EBD8-4BDC-A175-DB3BD43452B7}_is1"
+          function Wait-Until([string]$what, [scriptblock]$ok, [int]$seconds = 60) {
+            $deadline = (Get-Date).AddSeconds($seconds)
+            while (-not (& $ok)) {
+              if ((Get-Date) -gt $deadline) { throw "Timed out waiting for: $what" }
+              Start-Sleep -Milliseconds 500
+            }
+          }
+          function Watchers { @(Get-Process wherefromw -ErrorAction SilentlyContinue).Count }
+          function Install-Once([string]$log) {
+            # -PassThru + WaitForExit: -Wait would also wait for the watcher it starts, forever
+            $p = Start-Process dist\wherefrom-setup.exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$log" -PassThru
+            $null = $p.Handle       # without this, ExitCode can come back empty
+            $p.WaitForExit()
+            if ($p.ExitCode -ne 0) { Get-Content $log -Tail 30; throw "the installer exited with $($p.ExitCode)" }
+          }
+          function Check-Installed {
+            if (-not (Test-Path "$app\wherefrom.exe") -or -not (Test-Path "$app\wherefromw.exe")) { throw "programs missing" }
+            $log = Get-Content "$app\setup.log" -Raw
+            Write-Output $log
+            if ($log -notmatch "Done\.") { throw "wherefrom setup didn't finish" }
+            $command = (Get-ItemProperty -LiteralPath $menu).'(default)'
+            if ($command -notlike "*$app\wherefromw.exe*show --gui*") { throw "menu entry: $command" }
+            $atLogin = (Get-ItemProperty -LiteralPath $run).wherefrom
+            if ($atLogin -notlike "*$app\wherefromw.exe*watch") { throw "start at sign-in: $atLogin" }
+            if (-not (Test-Path -LiteralPath $hostKey)) { throw "browser connection missing" }
+            if (-not (Test-Path -LiteralPath $entry)) { throw "Apps & features entry missing" }
+            if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\wherefrom.lnk")) { throw "Start menu entry missing" }
+            Wait-Until "the watcher to run" { (Watchers) -ge 1 }
+            $version = & "$app\wherefrom.exe" --version
+            if ($LASTEXITCODE -ne 0) { throw "--version failed" }
+            Write-Output "Installed: $version"
+          }
+
+          Install-Once "$env:RUNNER_TEMP\install.log"
+          Check-Installed
+          # Again, over the running watcher: an upgrade
+          Install-Once "$env:RUNNER_TEMP\upgrade.log"
+          Check-Installed
+
+          # The uninstaller copies itself to TEMP and returns at once, so wait for its work
+          $u = Start-Process "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
+          $u.WaitForExit()
+          Wait-Until "the uninstaller to finish" { -not (Test-Path -LiteralPath $entry) -and -not (Test-Path "$app\wherefrom.exe") } 120
+          Wait-Until "the watcher to stop" { (Watchers) -eq 0 }
+          if (Test-Path -LiteralPath $menu) { throw "menu entry left behind" }
+          if ((Get-ItemProperty -LiteralPath $run).PSObject.Properties.Name -contains "wherefrom") { throw "start at sign-in left behind" }
+          if (Test-Path -LiteralPath $hostKey) { throw "browser connection left behind" }
+          if (-not (Test-Path "$env:LOCALAPPDATA\wherefrom\ledger.sqlite3")) { throw "the database should be kept" }
+          Write-Output "::notice::wherefrom-setup.exe installed, upgraded over a running watcher, and uninstalled cleanly"
+
       - uses: actions/upload-artifact@v7
         with:
           name: wherefrom-windows
           path: |
             dist/wherefrom.exe
             dist/wherefromw.exe
+            dist/wherefrom-setup.exe
 
   extension:
     # The extension's store packages (Chrome Web Store / Edge, Firefox)
@@ -157,7 +236,7 @@ jobs:
             exit 1
           fi
           mkdir release
-          cp artifacts/wherefrom-windows/wherefrom.exe artifacts/wherefrom-windows/wherefromw.exe release/
+          cp artifacts/wherefrom-windows/wherefrom-setup.exe artifacts/wherefrom-windows/wherefrom.exe artifacts/wherefrom-windows/wherefromw.exe release/
           cp artifacts/wherefrom-extension/wherefrom-chromium-$version.zip release/
           cp artifacts/wherefrom-extension/wherefrom-firefox-$version.zip release/
           (cd release && sha256sum * > SHA256SUMS.txt)

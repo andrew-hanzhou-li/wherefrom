@@ -70,7 +70,16 @@ def cmd_search(args, ledger):
 
 
 def cmd_watch(args, ledger):
+    import hashlib
+    from . import lock
     folders = args.folder or [downloads_folder()]
+    # One watcher per set of folders: a second one for the same folders would
+    # only do the same work twice
+    key = hashlib.sha256("\n".join(sorted(str(Path(f).resolve()) for f in folders)).encode()).hexdigest()[:12]
+    held = lock.hold(Path(ledger.path).parent / "locks" / f"watch-{key}.lock")
+    if held is None:
+        print("A wherefrom watcher for " + ", ".join(str(f) for f in folders) + " is already running.")
+        return 0
     print("Watching " + ", ".join(str(f) for f in folders) + " (Ctrl+C to stop)")
     try:
         Watcher(ledger, folders, sidecars=args.sidecars).run(interval=args.interval)
@@ -166,6 +175,11 @@ def cmd_import(args, ledger):
     return 0
 
 
+def cmd_setup(args, ledger):
+    from . import quickstart
+    return quickstart.run(ledger, do_import=not args.no_import, do_start=not args.no_start)
+
+
 def cmd_install(args, ledger):
     if sys.platform == "win32":
         shell.install(shell.WindowsRegistry(), autostart=args.autostart)
@@ -204,6 +218,12 @@ def build_parser():
         prog="wherefrom", description="Remember where your downloaded files came from.")
     parser.add_argument("--version", action="version", version=f"wherefrom {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    setup = sub.add_parser("setup", help="set everything up in one go: menu entry, start at sign-in, "
+                                         "browser connection, download history, and start watching")
+    setup.add_argument("--no-import", action="store_true", help="skip reading the browsers' download history")
+    setup.add_argument("--no-start", action="store_true", help="don't start the watcher now")
+    setup.set_defaults(run=cmd_setup)
 
     show = sub.add_parser("show", help="where a file came from")
     show.add_argument("file")
