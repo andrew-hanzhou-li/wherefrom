@@ -1,8 +1,10 @@
 # wherefrom
 
-Right-click any file and see where it came from: the link it was downloaded from, the page that link was on, and when. It still works after the file has been renamed, moved, or copied to a USB stick or another computer.
+**Right-click any file and see where you downloaded it from**: the link, the page that link was on, and when. It still works after the file has been renamed, moved, or copied to a USB stick or another computer.
 
-Works on Windows, macOS and Linux.
+**[Download for Windows](https://github.com/andrew-hanzhou-li/wherefrom/releases/latest/download/wherefrom-setup.exe)** (one double-click, no admin rights) · [macOS and Linux](#macos-and-linux) · Free and open source (MIT) · Nothing leaves your computer
+
+<!-- Demo GIF goes here: right-click a file in Downloads > "Where did this come from?" > the window. -->
 
 ```
 > wherefrom show "D:\Backup\final version.pdf"
@@ -19,6 +21,16 @@ D:\Backup\final version.pdf
 When a browser saves a file, the system attaches a hidden note with the address it came from: the "Mark of the Web" on Windows, "Where from" on macOS, `user.xdg.origin.url` on Linux (from Chrome). It's rarely shown and easy to lose: copying the file to a USB stick, a FAT drive, many cloud folders or an email drops it. The browser remembers too, until you clear your history.
 
 wherefrom keeps that information in a small database of its own, next to a fingerprint (SHA-256) of each file's contents. Any later copy with the same contents, under any name and in any folder, can be traced back.
+
+Handy when you need to cite where a PDF or dataset came from, find the course page a file was attached to, check where an installer really came from, or just make sense of a messy Downloads folder.
+
+## Why not just...
+
+- **...look in the file's Properties?** Windows does keep the link, but Explorer never shows it; you'd need `Get-Content file -Stream Zone.Identifier` in PowerShell. It's gone once the file goes through a USB stick, an email or many cloud folders, or once you click **Unblock**. macOS shows **Where from** in Get Info, but it can be lost the same way.
+- **...check the browser's download history?** It's lost when you clear your history, and it can't tell you about a file that's since been renamed or moved, or a copy of it somewhere else.
+- **...use a forensics tool?** Those read the same notes, for investigators. wherefrom is one right-click.
+
+wherefrom also covers what you downloaded before installing it: setup reads the notes already on your files and your browsers' history, so it's useful from the first minute.
 
 ## Install
 
@@ -120,7 +132,7 @@ pip install pytest
 python -m pytest
 ```
 
-`python packaging/build_extension.py` builds the extension's store packages into `dist/extension`; `python packaging/make_icons.py` redraws its icons (needs Pillow).
+`python packaging/build_extension.py` builds the extension's store packages into `dist/extension`; `python packaging/make_icons.py` redraws its icons (needs Pillow). `python packaging/make_social_preview.py` redraws `docs/social-preview.png`, the card shown when the repository's link is shared.
 
 Some tests need a particular system (Windows streams and registry, macOS attributes) or a display; they run in CI on Windows, macOS and Linux. `tests/test_extension_e2e.py` drives a real Chromium with the extension loaded (it needs Python Playwright and a display).
 
