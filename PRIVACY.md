@@ -25,7 +25,7 @@ You decide what leaves your computer: `wherefrom export` and `wherefrom sidecar`
 
 ## Removing your data
 
-Delete the database folder. `wherefrom browser remove` and `wherefrom uninstall` undo the setup, and removing the extension in the browser stops it at once.
+Delete the database folder. Uninstalling wherefrom (Settings > Apps on Windows, or `wherefrom uninstall` and `wherefrom browser remove`) undoes the setup, and removing the extension in the browser stops it at once.
 
 ## Sharing and selling
 

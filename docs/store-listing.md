@@ -53,7 +53,7 @@ Text to paste into each store's forms, and the steps around it. The packages com
 
 **Notes for the reviewer:**
 
-> The extension works together with the open-source desktop program wherefrom (https://github.com/andrew-hanzhou-li/wherefrom), through native messaging. Without the program it does nothing and logs one console warning per download. To test it: install wherefrom from the latest GitHub release, run `wherefrom browser setup --extension-id <this item's ID>`, download any file, then run `wherefrom search <site>`. The download is listed with "Known from: the wherefrom browser extension". The code is one unminified file, background.js.
+> The extension works together with the open-source desktop program wherefrom (https://github.com/andrew-hanzhou-li/wherefrom), through native messaging. Without the program it does nothing and logs one console warning per download. To test it on Windows: run wherefrom-setup.exe from the latest GitHub release, then in a terminal `%LOCALAPPDATA%\Programs\wherefrom\wherefrom.exe browser setup --extension-id <this item's ID>`, download any file, and run `wherefrom.exe search <site>` from the same folder. The download is listed with "Known from: the wherefrom browser extension". The code is one unminified file, background.js.
 
 ## Firefox Add-ons
 

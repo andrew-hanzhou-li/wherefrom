@@ -22,36 +22,54 @@ wherefrom keeps that information in a small database of its own, next to a finge
 
 ## Install
 
-**Windows:** download `wherefrom.exe` and `wherefromw.exe` from the [latest release](https://github.com/andrew-hanzhou-li/wherefrom/releases/latest), put them in a folder such as `%LOCALAPPDATA%\Programs\wherefrom`, and run there:
+### Windows
+
+**[Download wherefrom-setup.exe](https://github.com/andrew-hanzhou-li/wherefrom/releases/latest/download/wherefrom-setup.exe)** and double-click it. That's all.
+
+It needs no admin rights and sets everything up:
+
+- **Where did this come from?** in the right-click menu of every file (on Windows 11 under **Show more options**);
+- the download history of Chrome, Edge, Brave, Vivaldi and Firefox, read in the background, so files you downloaded before are covered too;
+- the watcher, which records new downloads from now on and starts again when you sign in;
+- **wherefrom** in the Start menu, a window to browse and search everything recorded.
+
+The installer isn't code-signed yet, so Windows SmartScreen may say it "protected your PC": click **More info**, then **Run anyway**. `SHA256SUMS.txt` in the [release](https://github.com/andrew-hanzhou-li/wherefrom/releases/latest) lets you check the download. To update, run a newer installer; to remove wherefrom, use **Settings > Apps**.
+
+### macOS and Linux
+
+You need Python 3.11 or later with Tk (Debian/Ubuntu: `sudo apt install python3-tk pipx`; macOS with Homebrew: `brew install python-tk pipx`). Then:
 
 ```
-wherefrom install --autostart
-wherefrom import-browsers
+pipx install git+https://github.com/andrew-hanzhou-li/wherefrom
+wherefrom setup
 ```
 
-**Any system, with Python 3.11 or later:** `pip install .` in this folder, then the same two commands.
+If `wherefrom` isn't found after the first command, run `pipx ensurepath` and open a new terminal. (`uv tool install git+https://github.com/andrew-hanzhou-li/wherefrom` works too.)
 
-- `install` adds **Where did this come from?** to the right-click menu of every file: Explorer on Windows (on Windows 11 under **Show more options**), GNOME Files (under **Scripts**) and KDE Dolphin on Linux. macOS has no Finder entry; use `wherefrom show` or the window (`wherefrom app`). With `--autostart` the watcher also starts when you sign in.
-- `import-browsers` reads the download history of Chrome, Edge, Brave, Vivaldi, Chromium and Firefox, so files you downloaded before installing are covered too.
+`wherefrom setup` does in one go what the Windows installer does: the menu entry (GNOME Files under **Scripts**, KDE Dolphin; macOS has no Finder entry, so use `wherefrom app`), start at sign-in, the browser connection, the download history, and starting the watcher. Running it again is safe. On macOS, if you're asked whether Python may access your Downloads folder, allow it, or the watcher can't see new files.
 
-Nothing needs admin rights: everything is per user. The programs aren't code-signed yet, so Windows SmartScreen may warn about an unknown publisher the first time; `SHA256SUMS.txt` in the release lets you check the download.
+### Without installing
+
+The release also has `wherefrom.exe` and `wherefromw.exe` on their own: put them in one folder and run `wherefrom setup` there. From a copy of this repository, `pip install .` then `wherefrom setup`.
 
 ### Optional: the browser extension
 
-The extension records every download the moment it finishes, with the final link after redirects, the link first clicked, the page and the file type. It also covers programs and settings where the browser leaves no download note on the file.
+You don't need it: wherefrom already reads what the browser records. The extension adds a little more for each download (the link before redirects, the file type) and covers the few downloads the browser leaves no note on.
 
-1. Run `wherefrom browser setup`. It connects wherefrom to every browser installed for your user and prints a folder.
-2. **Chrome, Edge, Brave, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick that folder.
-3. **Firefox:** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick the printed `manifest.json`. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
+The installer (or `wherefrom setup`) has already connected your browsers. To add the extension itself:
 
-It sends only finished downloads to wherefrom on your own computer, never anything about the pages you visit, and nothing from private or incognito windows. `wherefrom browser remove` undoes the setup. See [PRIVACY.md](PRIVACY.md).
+- **Chrome, Edge, Brave, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick `%LOCALAPPDATA%\wherefrom\browser\extension-chromium` (Windows) or the folder `wherefrom browser setup` prints.
+- **Firefox:** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick `manifest.json` in the `extension-firefox` folder next to it. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
 
-Store versions (Chrome Web Store, Edge Add-ons, Firefox Add-ons) are on the way; they'll replace steps 2 and 3. `wherefrom browser setup` still has to run once, since the extension only talks to wherefrom on your computer.
+It sends only finished downloads to wherefrom on your own computer, never anything about the pages you visit, and nothing from private or incognito windows. `wherefrom browser remove` undoes the connection. See [PRIVACY.md](PRIVACY.md).
 
 ## Commands
 
+You don't need any of these for everyday use: the menu entry and the window cover it. The Windows installer doesn't add wherefrom to PATH; in a terminal, run it as `& "$env:LOCALAPPDATA\Programs\wherefrom\wherefrom.exe"` (PowerShell), or add that folder to your PATH.
+
 | Command | What it does |
 |---|---|
+| `wherefrom setup` | Set everything up in one go (`--no-import`, `--no-start` to skip those steps) |
 | `wherefrom show FILE` | Where a file came from (`--gui` for the small window the menu opens) |
 | `wherefrom app` | A window to browse and search everything recorded |
 | `wherefrom search TEXT` | Files from a site or URL, or with a name, e.g. `wherefrom search canvas` |
@@ -89,7 +107,11 @@ Everything stays on your computer. wherefrom makes no network connections. The *
 
 ## Uninstall
 
-`wherefrom uninstall` removes the menu entry and the start-at-login entry, and `wherefrom browser remove` the extension's connection (remove the extension itself in the browser). Then delete the program and, if you like, the database folder.
+**Installed with wherefrom-setup.exe:** remove **wherefrom** in **Settings > Apps**. That stops the watcher and removes the menu entry, start at sign-in and the browser connection. Remove the extension itself in the browser.
+
+**Otherwise:** `wherefrom uninstall` removes the menu entry and the start-at-login entry (on macOS it also stops the watcher), and `wherefrom browser remove` the extension's connection. Then delete the program.
+
+Either way the database of recorded downloads is kept; delete its folder (see "How it works") if you want it gone.
 
 ## Development
 
@@ -106,7 +128,7 @@ Some tests need a particular system (Windows streams and registry, macOS attribu
 
 1. Put the new version in `pyproject.toml`, `wherefrom/__init__.py` and both `wherefrom/extension/manifest_*.json` (a test checks they match).
 2. Merge to `main`, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`.
-3. CI tests, builds and publishes a GitHub Release with `wherefrom.exe`, `wherefromw.exe`, the two store packages and `SHA256SUMS.txt`. It refuses a tag that doesn't match the version.
+3. CI tests, builds and publishes a GitHub Release with `wherefrom-setup.exe`, `wherefrom.exe`, `wherefromw.exe`, the two store packages and `SHA256SUMS.txt`. It refuses a tag that doesn't match the version. The installer keeps its name in every release, so the README's download link always gets the newest one.
 4. Upload the store packages to the stores (see [docs/store-listing.md](docs/store-listing.md)).
 
 ## License

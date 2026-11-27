@@ -1,5 +1,6 @@
 """Draw the extension's icons: a download arrow landing in a tray, on a
-rounded square. Run it after changing the drawing; the PNGs are committed.
+rounded square. Run it after changing the drawing; the PNGs and the .ico
+are committed.
 
     pip install pillow
     python packaging/make_icons.py
@@ -13,6 +14,8 @@ SIZES = (16, 32, 48, 128)
 BACKGROUND = (22, 96, 136, 255)     # deep blue-teal
 FOREGROUND = (255, 255, 255, 255)
 OUT = Path(__file__).resolve().parent.parent / "wherefrom" / "extension" / "icons"
+# The programs' and installer's icon (Windows)
+ICO = Path(__file__).resolve().parent / "wherefrom.ico"
 
 
 def draw(scale=512):
@@ -37,6 +40,8 @@ def main():
     for size in SIZES:
         big.resize((size, size), Image.LANCZOS).save(OUT / f"icon-{size}.png", optimize=True)
         print(OUT / f"icon-{size}.png")
+    big.save(ICO, sizes=[(s, s) for s in (16, 24, 32, 48, 64, 128, 256)])
+    print(ICO)
 
 
 if __name__ == "__main__":
