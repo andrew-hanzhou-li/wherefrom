@@ -29,7 +29,7 @@ wherefrom keeps that information in a small database of its own, next to a finge
 It needs no admin rights and sets everything up:
 
 - **Where did this come from?** in the right-click menu of every file (on Windows 11 under **Show more options**);
-- the download history of Chrome, Edge, Brave, Vivaldi and Firefox, read in the background, so files you downloaded before are covered too;
+- the download history of Chrome, Edge, Brave, Vivaldi, Chromium and Firefox, read in the background, so files you downloaded before are covered too;
 - the watcher, which records new downloads from now on and starts again when you sign in;
 - **wherefrom** in the Start menu, a window to browse and search everything recorded.
 

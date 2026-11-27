@@ -64,10 +64,17 @@ def test_start_watcher_on_macos_goes_through_launchd(tmp_path):
     plist = desktop.mac_files(tmp_path)["autostart"]
     assert calls[0][:2] == ["launchctl", "bootstrap"] and calls[0][-1] == str(plist)
 
-    def refused(cmd, **kwargs):
-        return subprocess.CompletedProcess(cmd, 1, "", "Bootstrap failed: 1: Operation not permitted")
+    def already_loaded(cmd, **kwargs):
+        # bootstrap fails because the job is loaded; print confirms it is
+        return subprocess.CompletedProcess(cmd, 5 if cmd[1] == "bootstrap" else 0, "", "Bootstrap failed: 5")
 
-    with pytest.raises(OSError, match="not permitted"):
+    quickstart.start_watcher("darwin", tmp_path, run=already_loaded)        # no error
+
+    def refused(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 5 if cmd[1] == "bootstrap" else 113, "",
+                                           "Bootstrap failed: 5: Input/output error")
+
+    with pytest.raises(OSError, match="Input/output error"):
         quickstart.start_watcher("darwin", tmp_path, run=refused)
 
 

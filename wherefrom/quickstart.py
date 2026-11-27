@@ -39,9 +39,12 @@ def start_watcher(platform=None, home=None, popen=subprocess.Popen, run=subproce
         uid = os.getuid() if hasattr(os, "getuid") else 0
         result = run(["launchctl", "bootstrap", f"gui/{uid}", str(plist)],  # nosec B603 B607
                      capture_output=True, text=True, check=False)
-        # Already loaded (setup run again) is fine: it's running
-        if result.returncode not in (0, 5, 37) and "already" not in (result.stderr or ""):
-            raise OSError(f"launchctl bootstrap failed: {(result.stderr or '').strip()}")
+        if result.returncode != 0:
+            # Already loaded (setup run again) also fails; that's fine if launchd has the job
+            loaded = run(["launchctl", "print", f"gui/{uid}/{desktop.LAUNCH_AGENT}"],  # nosec B603 B607
+                         capture_output=True, text=True, check=False)
+            if loaded.returncode != 0:
+                raise OSError(f"launchctl bootstrap failed: {(result.stderr or '').strip()}")
         return
     quiet = {"stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     if platform == "win32":
