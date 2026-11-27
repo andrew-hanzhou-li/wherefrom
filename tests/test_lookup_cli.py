@@ -140,7 +140,7 @@ def test_main_install_and_uninstall(capsys):
 def test_gui_window_opens_and_closes(tmp_path, ledger, monkeypatch):
     tkinter = pytest.importorskip("tkinter")
     try:
-        tkinter.Tk().destroy()
+        gui.new_window().destroy()      # retries Windows' Tcl startup hiccup
     except tkinter.TclError:
         pytest.skip("no display")
     opened = []
@@ -177,7 +177,7 @@ def test_new_window_retries_only_the_init_tcl_hiccup(monkeypatch):
     def flaky():
         calls.append(1)
         if len(calls) < 3:
-            raise tkinter.TclError("Can't find a usable init.tcl in the following directories")
+            raise tkinter.TclError("Can't find a usable tk.tcl in the following directories")
         return "window"
     monkeypatch.setattr(tkinter, "Tk", flaky)
     assert gui.new_window(pause=0) == "window" and len(calls) == 3

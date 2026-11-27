@@ -1,6 +1,6 @@
 import pytest
 
-from wherefrom import app
+from wherefrom import app, gui
 from wherefrom.ledger import Record
 
 
@@ -59,7 +59,7 @@ def test_summary():
 def test_window_opens_lists_and_searches(tmp_path, ledger, monkeypatch):
     tkinter = pytest.importorskip("tkinter")
     try:
-        tkinter.Tk().destroy()
+        gui.new_window().destroy()      # retries Windows' Tcl startup hiccup
     except tkinter.TclError:
         pytest.skip("no display")
     from tkinter import ttk
@@ -94,7 +94,7 @@ def test_the_list_is_actually_visible(tmp_path, ledger, monkeypatch):
     # The rows can exist while another widget covers them; check what's on top
     tkinter = pytest.importorskip("tkinter")
     try:
-        tkinter.Tk().destroy()
+        gui.new_window().destroy()      # retries Windows' Tcl startup hiccup
     except tkinter.TclError:
         pytest.skip("no display")
     from tkinter import ttk
