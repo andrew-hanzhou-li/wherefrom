@@ -28,6 +28,11 @@ def rows_for(finding):
     return rows
 
 
+# How Tcl reports a startup script it couldn't read: either outright, or as a
+# missing helper that init.tcl defines when init.tcl was only partly read.
+STARTUP_HICCUPS = ("Can't find a usable", 'invalid command name "tcl_findLibrary"')
+
+
 def new_window(attempts=4, pause=0.5):
     """tk.Tk(), tried again briefly if Tcl can't read its own startup scripts
     (init.tcl, tk.tcl, ttk/*.tcl): on Windows those reads can fail for a moment,
@@ -39,7 +44,7 @@ def new_window(attempts=4, pause=0.5):
         try:
             return tk.Tk()
         except tk.TclError as error:
-            if "Can't find a usable" not in str(error) or attempt == attempts - 1:
+            if not any(text in str(error) for text in STARTUP_HICCUPS) or attempt == attempts - 1:
                 raise
             time.sleep(pause)
 
