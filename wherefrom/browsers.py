@@ -78,11 +78,20 @@ def mac_histories(home):
     return found + profiles_in("firefox", support / "Firefox" / "Profiles", "places.sqlite")
 
 
-def linux_histories(home):
+def linux_path(home, folder, config_home=None):
+    """A folder written as ".config/..." is really under $XDG_CONFIG_HOME when
+    that's set, as Chrome and Chromium do; everything else is under home."""
+    if folder.startswith(".config/"):
+        config = config_home or os.environ.get("XDG_CONFIG_HOME") or Path(home) / ".config"
+        return Path(config) / folder[len(".config/"):]
+    return Path(home) / folder
+
+
+def linux_histories(home, config_home=None):
     found = []
     for browser, folders in CHROMIUM_LINUX.items():
         for folder in folders:
-            found += profiles_in(browser, Path(home) / folder, "History")
+            found += profiles_in(browser, linux_path(home, folder, config_home), "History")
     for folder in FIREFOX_LINUX:
         found += profiles_in("firefox", Path(home) / folder, "places.sqlite")
     return found

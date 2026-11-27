@@ -61,8 +61,9 @@ jobs:
         shell: bash
         run: |
           [ -f test-output.txt ] || exit 0
-          { grep -E 'FAIL|ERROR|Error|assert|Traceback|failed' test-output.txt || true; tail -n 5 test-output.txt; } \
-            | awk '!seen[$0]++' | head -n 20 | while IFS= read -r line; do echo "::error::${line:0:400}"; done
+          # Each failure's own error lines ("E ...") first, so none is crowded out
+          { grep -E '^(E  |FAILED)' test-output.txt || true; grep -E 'Error|Traceback|failed' test-output.txt || true; tail -n 5 test-output.txt; } \
+            | awk '!seen[$0]++' | head -n 40 | while IFS= read -r line; do echo "::error::${line:0:400}"; done
 
   build:
     # The two .exe files: wherefrom.exe for the command line, wherefromw.exe

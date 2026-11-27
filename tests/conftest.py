@@ -18,8 +18,11 @@ def ledger(tmp_path):
 
 @pytest.fixture(autouse=True)
 def private_home(tmp_path, monkeypatch):
-    """Never touch a real ledger, even when a test calls main()."""
+    """Never touch a real ledger or config folder, even when a test calls main()."""
     monkeypatch.setenv("WHEREFROM_HOME", str(tmp_path / "home"))
+    # CI machines set these; tests that need them set their own
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
 
 
 class FakeMarks:

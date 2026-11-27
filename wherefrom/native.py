@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
 
+from .browsers import linux_path
 from .ledger import Ledger, default_home
 from .watch import file_hash
 
@@ -186,7 +187,7 @@ def manifest_dirs(platform, home):
     if platform == "darwin":
         support = Path(home) / "Library" / "Application Support"
         return {kind: [support / d / "NativeMessagingHosts" for d in dirs] for kind, dirs in MAC_DIRS.items()}
-    linux = {kind: [Path(home) / d / "NativeMessagingHosts" for d in dirs] for kind, dirs in LINUX_DIRS.items()}
+    linux = {kind: [linux_path(home, d) / "NativeMessagingHosts" for d in dirs] for kind, dirs in LINUX_DIRS.items()}
     linux["firefox"] = [Path(home) / ".mozilla" / "native-messaging-hosts"]
     return linux
 

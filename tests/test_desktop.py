@@ -12,6 +12,10 @@ from wherefrom.watch import downloads_folder
 CMD = ["/opt/My Python/bin/python3", "-P", "-m", "wherefrom"]
 
 
+LINUX_ONLY = pytest.mark.skipif(sys.platform == "win32", reason="the Nautilus script's name has a '?', which Windows can't store")
+
+
+@LINUX_ONLY
 def test_linux_install_and_uninstall(tmp_path):
     written = desktop.install("linux", tmp_path, autostart=True, cmd=CMD)
     files = desktop.linux_files(tmp_path, tmp_path / ".config", tmp_path / ".local" / "share")
@@ -35,6 +39,7 @@ def test_uninstall_leaves_files_it_did_not_write(tmp_path):
     assert files["autostart"].exists()
 
 
+@LINUX_ONLY
 def test_autostart_only_when_asked(tmp_path):
     desktop.install("linux", tmp_path, autostart=False, cmd=CMD)
     files = desktop.linux_files(tmp_path, tmp_path / ".config", tmp_path / ".local" / "share")
@@ -76,7 +81,8 @@ def test_the_nautilus_script_passes_odd_names_safely(tmp_path):
 def test_downloads_folder(tmp_path):
     config = tmp_path / ".config"
     config.mkdir()
-    (config / "user-dirs.dirs").write_text('XDG_DESKTOP_DIR="$HOME/Desktop"\nXDG_DOWNLOAD_DIR="$HOME/Téléchargements"\n')
+    (config / "user-dirs.dirs").write_text('XDG_DESKTOP_DIR="$HOME/Desktop"\nXDG_DOWNLOAD_DIR="$HOME/Téléchargements"\n',
+                                           encoding="utf-8")
     assert downloads_folder("linux", tmp_path, config) == tmp_path / "Téléchargements"
     assert downloads_folder("linux", tmp_path, tmp_path / "none") == tmp_path / "Downloads"
     assert downloads_folder("darwin", tmp_path) == tmp_path / "Downloads"
@@ -93,3 +99,15 @@ def test_cli_install_and_uninstall(tmp_path, monkeypatch, capsys):
     assert "Wrote" in out and "start when you sign in" in out
     assert cli.main(["uninstall"]) == 0
     assert "Removed" in capsys.readouterr().out
+
+
+def test_xdg_config_home_is_followed(tmp_path, monkeypatch):
+    # GitHub's Linux machines (and some desktops) move ~/.config; Chrome follows it
+    from wherefrom import browsers, native
+    custom = tmp_path / "elsewhere"
+    (custom / "google-chrome" / "Default").mkdir(parents=True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(custom))
+    assert browsers.linux_path(tmp_path, ".config/google-chrome") == custom / "google-chrome"
+    assert browsers.linux_path(tmp_path, ".mozilla/firefox") == tmp_path / ".mozilla" / "firefox"
+    summary = native.setup("linux", tmp_path, tmp_path / "data", cmd=["/usr/bin/python3"])
+    assert summary["registered"] == [str(custom / "google-chrome" / "NativeMessagingHosts" / f"{native.HOST_NAME}.json")]
