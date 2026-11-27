@@ -2,9 +2,10 @@
 
 import argparse
 import sys
+from pathlib import Path
 from datetime import datetime
 
-from . import __version__, browsers, portable, shell
+from . import __version__, browsers, desktop, portable, shell
 from .ledger import SOURCE_NAMES, Ledger
 from .lookup import look_up
 from .watch import Watcher, downloads_folder
@@ -40,7 +41,8 @@ def describe(finding):
                      f" as {first.path}")
         lines.append(f"  Known from       {SOURCE_NAMES.get(first.source, first.source)}")
     elif finding.mark:
-        lines.append(f"  Known from       {SOURCE_NAMES['mark']} (zone: {finding.mark.zone_name})")
+        zone = f" (zone: {finding.mark.zone_name})" if finding.mark.zone_id is not None else ""
+        lines.append(f"  Known from       {SOURCE_NAMES['mark']}{zone}")
     for copy in finding.other_copies:
         lines.append(f"  Same file at     {copy}")
     return lines
@@ -130,16 +132,28 @@ def cmd_import(args, ledger):
 
 
 def cmd_install(args, ledger):
-    shell.install(shell.WindowsRegistry(), autostart=args.autostart)
-    print("Added \"Where did this come from?\" to the right-click menu of files.")
-    print("(On Windows 11 it's under \"Show more options\".)")
+    if sys.platform == "win32":
+        shell.install(shell.WindowsRegistry(), autostart=args.autostart)
+        print("Added \"Where did this come from?\" to the right-click menu of files.")
+        print("(On Windows 11 it's under \"Show more options\".)")
+    else:
+        for path in desktop.install(sys.platform, Path.home(), autostart=args.autostart):
+            print(f"Wrote {path}")
+        if sys.platform == "darwin":
+            print("Finder has no menu entry; use \"wherefrom show FILE\" or \"wherefrom app\".")
+        else:
+            print("Added \"Where did this come from?\" to GNOME Files (Scripts) and KDE Dolphin.")
     if args.autostart:
         print("The watcher will also start when you sign in.")
     return 0
 
 
 def cmd_uninstall(args, ledger):
-    shell.uninstall(shell.WindowsRegistry())
+    if sys.platform == "win32":
+        shell.uninstall(shell.WindowsRegistry())
+    else:
+        for path in desktop.uninstall(sys.platform, Path.home()):
+            print(f"Removed {path}")
     print("Removed the menu entry and the start-at-login entry. The ledger is kept;")
     print("delete it by hand if you want: " + str(ledger_path_hint()))
     return 0
@@ -195,7 +209,7 @@ def build_parser():
     imp = sub.add_parser("import-browsers", help="add your browsers' download history")
     imp.set_defaults(run=cmd_import)
 
-    install = sub.add_parser("install", help="add the right-click menu entry (Windows)")
+    install = sub.add_parser("install", help="add the right-click menu entry (Windows, Linux)")
     install.add_argument("--autostart", action="store_true",
                          help="also start the watcher when you sign in")
     install.set_defaults(run=cmd_install)
@@ -212,9 +226,6 @@ def main(argv=None):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     args = build_parser().parse_args(argv)
-    if args.command in ("install", "uninstall") and sys.platform != "win32":
-        print("install and uninstall are for Windows.", file=sys.stderr)
-        return 2
     ledger = Ledger()
     try:
         return args.run(args, ledger)

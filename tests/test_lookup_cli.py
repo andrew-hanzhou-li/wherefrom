@@ -96,11 +96,6 @@ def test_main_scan(tmp_path, capsys):
     assert "0 new file(s)" in capsys.readouterr().out
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="checks the non-Windows message")
-def test_install_needs_windows():
-    assert cli.main(["install"]) == 2
-
-
 def test_version(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--version"])
@@ -114,6 +109,7 @@ def test_main_import_browsers(tmp_path, capsys, monkeypatch):
     profile = tmp_path / "Local" / "Google" / "Chrome" / "User Data" / "Default"
     profile.mkdir(parents=True)
     make_chromium_history(profile / "History", [(str(f), ["https://dl.test/x.bin"], "", "", 1, 0)])
+    monkeypatch.setattr(sys, "platform", "win32")          # this test lays out Windows' folders
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "Local"))
     monkeypatch.setenv("APPDATA", str(tmp_path / "Roaming"))
     monkeypatch.setenv("WHEREFROM_HOME", str(tmp_path / "home"))

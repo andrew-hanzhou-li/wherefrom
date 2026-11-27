@@ -50,8 +50,7 @@ ADDED_COLUMNS = {
 
 # Where a record's information came from, for people
 SOURCE_NAMES = {
-    "mark": "the file's Mark of the Web",
-    "xattr": "the file's download information (saved by the system)",
+    "mark": "the download information saved with the file",
     "chrome": "Chrome's download history",
     "edge": "Edge's download history",
     "brave": "Brave's download history",
@@ -123,7 +122,7 @@ class Ledger:
     def add(self, sha256, size, path, mark=None, source="mark", downloaded_at=None,
             host_url=None, referrer_url=None, mime=None, original_url=None, recorded_at=None,
             name=None):
-        """Remember one file. A mark (from zone.read or xattrs.read) fills in
+        """Remember one file. A mark (from marks.read) fills in
         the URLs. Returns True if this was new."""
         zone_id = None
         if mark is not None:

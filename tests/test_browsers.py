@@ -136,3 +136,37 @@ def test_import_all_finds_profiles(tmp_path, ledger):
     assert [r[0] for r in results if r[2] is None] == ["brave"]   # reported, not a crash
     record = ledger.search("dl.test")[0]
     assert record.referrer_url is None          # empty in the history means unknown
+
+
+def test_mac_and_linux_layouts(tmp_path):
+    home = tmp_path / "home"
+    mac = home / "Library" / "Application Support"
+    for folder in (mac / "Google" / "Chrome" / "Default", mac / "Microsoft Edge" / "Profile 2"):
+        folder.mkdir(parents=True)
+        make_chromium_history(folder / "History", [])
+    ff = mac / "Firefox" / "Profiles" / "x.default-release"
+    ff.mkdir(parents=True)
+    make_firefox_places(ff / "places.sqlite", [])
+    found = browsers.all_histories("darwin", home)
+    assert sorted(b for b, _ in found) == ["chrome", "edge", "firefox"]
+
+    linux_home = tmp_path / "lhome"
+    for folder in (".config/google-chrome/Default", "snap/chromium/common/chromium/Default",
+                   ".var/app/com.brave.Browser/config/BraveSoftware/Brave-Browser/Default"):
+        (linux_home / folder).mkdir(parents=True)
+        make_chromium_history(linux_home / folder / "History", [])
+    for folder in (".mozilla/firefox/abc.default", "snap/firefox/common/.mozilla/firefox/def.default"):
+        (linux_home / folder).mkdir(parents=True)
+        make_firefox_places(linux_home / folder / "places.sqlite", [])
+    found = browsers.all_histories("linux", linux_home)
+    assert sorted(b for b, _ in found) == ["brave", "chrome", "chromium", "firefox", "firefox"]
+
+
+def test_import_all_on_linux(tmp_path, ledger):
+    f = tmp_path / "x.bin"
+    f.write_bytes(b"x")
+    profile = tmp_path / "home" / ".config" / "google-chrome" / "Default"
+    profile.mkdir(parents=True)
+    make_chromium_history(profile / "History", [(str(f), ["https://dl.test/x.bin"], "", "", 1, 0)])
+    results = browsers.import_all(ledger, platform="linux", home=tmp_path / "home")
+    assert [(r[0], r[2], r[3]) for r in results] == [("chrome", 1, 1)]
