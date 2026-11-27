@@ -81,7 +81,8 @@ class WindowsRegistry:
 def install(registry, autostart=False):
     """Add the menu entry (and, if asked, start the watcher at login)."""
     registry.set_value(MENU_KEY, "", MENU_TEXT)
-    registry.set_value(MENU_KEY + r"\command", "", f'{launcher(windowed=True)} show --gui "%1"')
+    # "--": whatever the file is called, it's the file, not an option
+    registry.set_value(MENU_KEY + r"\command", "", f'{launcher(windowed=True)} show --gui -- "%1"')
     if autostart:
         registry.set_value(RUN_KEY, RUN_VALUE, f"{launcher(windowed=True)} watch")
 

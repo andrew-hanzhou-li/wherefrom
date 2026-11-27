@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "wherefrom",
+  "version": "0.2.0",
+  "description": "Tells the wherefrom program where each download came from, so you can look it up later.",
+  "permissions": ["downloads", "nativeMessaging"],
+  "background": { "service_worker": "background.js" },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzpAWDfgqjiuade6Tk+7qwHhiwNTWUuYUnYvcZvnAYHX0XVrOlga+15mm4EWgB5cl9/YoVjtDti6B6BY58e2XSQxow4glfxZgHGKPLAdPzcw5YUxEV7Hg06ex9PQRu3IKpWLJVpl3EKRiEUYhIC2f1Rq/tQ2dtN5G4ESJBU1h5dM5GhSWpGl89iB2JF07e/hNu/f1yCfN+YufC/DWdRoNbUeE5xqie5YVekwhnuU9Fk5nu6dZVdrm2moih9AC4X+sS44FF6wefMeJGOnmf7EmVK0rlz56mkZi4k701xEB9XKQsFlfclWauIh0EM2cQre0nrC/P6AjGNckRQw9y21TpwIDAQAB"
+}

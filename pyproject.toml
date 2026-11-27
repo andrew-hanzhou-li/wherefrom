@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wherefrom"
-version = "0.1.0"
+version = "0.2.0"
 description = "Remember where your downloaded files came from, even after they're copied or renamed."
 readme = "README.md"
 license = "MIT"
@@ -24,6 +24,9 @@ wherefromw = "wherefrom.cli:main"
 
 [tool.setuptools]
 packages = ["wherefrom"]
+
+[tool.setuptools.package-data]
+wherefrom = ["extension/*.js", "extension/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -8,6 +8,7 @@ browser's own files are never opened or changed.
 
 import os
 import shutil
+import sys
 import sqlite3
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -17,36 +18,95 @@ from urllib.parse import unquote, urlparse
 from .watch import file_hash
 
 # Chromium browsers: name -> "User Data" folder under %LOCALAPPDATA%
+# Where each Chromium browser keeps its profiles ("User Data" on Windows),
+# relative to %LOCALAPPDATA% on Windows, ~/Library/Application Support on
+# macOS and the home folder on Linux (with Snap and Flatpak installs too).
 CHROMIUM_BROWSERS = {
     "chrome": Path("Google", "Chrome", "User Data"),
     "edge": Path("Microsoft", "Edge", "User Data"),
     "brave": Path("BraveSoftware", "Brave-Browser", "User Data"),
     "vivaldi": Path("Vivaldi", "User Data"),
 }
+CHROMIUM_MAC = {
+    "chrome": Path("Google", "Chrome"),
+    "edge": Path("Microsoft Edge"),
+    "brave": Path("BraveSoftware", "Brave-Browser"),
+    "vivaldi": Path("Vivaldi"),
+    "chromium": Path("Chromium"),
+}
+CHROMIUM_LINUX = {
+    "chrome": [".config/google-chrome", ".var/app/com.google.Chrome/config/google-chrome"],
+    "edge": [".config/microsoft-edge", ".var/app/com.microsoft.Edge/config/microsoft-edge"],
+    "brave": [".config/BraveSoftware/Brave-Browser",
+              ".var/app/com.brave.Browser/config/BraveSoftware/Brave-Browser"],
+    "vivaldi": [".config/vivaldi"],
+    "chromium": [".config/chromium", "snap/chromium/common/chromium",
+                 ".var/app/org.chromium.Chromium/config/chromium"],
+}
+FIREFOX_LINUX = [".mozilla/firefox", "snap/firefox/common/.mozilla/firefox",
+                 ".var/app/org.mozilla.firefox/.mozilla/firefox"]
 
 CHROMIUM_COMPLETE = 1       # downloads.state for a finished download
 
 
+def profiles_in(browser, root, file_name):
+    """(browser, file) for each profile folder under `root` that has `file_name`."""
+    root = Path(root)
+    if not root.is_dir():
+        return []
+    return [(browser, profile / file_name) for profile in sorted(root.iterdir())
+            if (profile / file_name).is_file()]
+
+
 def chromium_histories(local_appdata):
-    """(browser, History file) for every profile of every Chromium browser."""
+    """Windows: (browser, History file) for every profile of every Chromium browser."""
     found = []
     for browser, user_data in CHROMIUM_BROWSERS.items():
-        root = Path(local_appdata) / user_data
-        if not root.is_dir():
-            continue
-        for profile in sorted(root.iterdir()):
-            history = profile / "History"
-            if history.is_file():
-                found.append((browser, history))
+        found += profiles_in(browser, Path(local_appdata) / user_data, "History")
     return found
 
 
 def firefox_histories(appdata):
-    root = Path(appdata) / "Mozilla" / "Firefox" / "Profiles"
-    if not root.is_dir():
-        return []
-    return [("firefox", p / "places.sqlite") for p in sorted(root.iterdir())
-            if (p / "places.sqlite").is_file()]
+    return profiles_in("firefox", Path(appdata) / "Mozilla" / "Firefox" / "Profiles", "places.sqlite")
+
+
+def mac_histories(home):
+    support = Path(home) / "Library" / "Application Support"
+    found = []
+    for browser, folder in CHROMIUM_MAC.items():
+        found += profiles_in(browser, support / folder, "History")
+    return found + profiles_in("firefox", support / "Firefox" / "Profiles", "places.sqlite")
+
+
+def linux_path(home, folder, config_home=None):
+    """A folder written as ".config/..." is really under $XDG_CONFIG_HOME when
+    that's set, as Chrome and Chromium do; everything else is under home."""
+    if folder.startswith(".config/"):
+        config = config_home or os.environ.get("XDG_CONFIG_HOME") or Path(home) / ".config"
+        return Path(config) / folder[len(".config/"):]
+    return Path(home) / folder
+
+
+def linux_histories(home, config_home=None):
+    found = []
+    for browser, folders in CHROMIUM_LINUX.items():
+        for folder in folders:
+            found += profiles_in(browser, linux_path(home, folder, config_home), "History")
+    for folder in FIREFOX_LINUX:
+        found += profiles_in("firefox", Path(home) / folder, "places.sqlite")
+    return found
+
+
+def all_histories(platform=None, home=None, local_appdata=None, appdata=None):
+    """Every browser history file on this computer, for this system."""
+    platform = platform or sys.platform
+    if platform == "win32":
+        local_appdata = local_appdata or os.environ.get("LOCALAPPDATA", "")
+        appdata = appdata or os.environ.get("APPDATA", "")
+        return (chromium_histories(local_appdata) if local_appdata else []) + \
+            (firefox_histories(appdata) if appdata else [])
+    home = home or Path.home()
+    return mac_histories(home) if platform == "darwin" else linux_histories(home)
 
 
 def copy_database(path, folder):
@@ -156,18 +216,15 @@ def import_history(ledger, browser, history_file):
     return len(downloads), recorded
 
 
-def import_all(ledger, local_appdata=None, appdata=None, on_start=None):
+def import_all(ledger, local_appdata=None, appdata=None, on_start=None, platform=None, home=None):
     """Import from every browser found. Returns [(browser, file, total, new)].
     on_start(browser, history_file) is called before each one, because
-    hashing every downloaded file can take a while."""
-    local_appdata = local_appdata or os.environ.get("LOCALAPPDATA", "")
-    appdata = appdata or os.environ.get("APPDATA", "")
+    hashing every downloaded file can take a while. (local_appdata/appdata
+    stand in for Windows' folders, mainly for tests.)"""
+    if local_appdata or appdata:
+        platform = platform or "win32"
     results = []
-    histories = []
-    if local_appdata:
-        histories += chromium_histories(local_appdata)
-    if appdata:
-        histories += firefox_histories(appdata)
+    histories = all_histories(platform, home, local_appdata, appdata)
     for browser, history in histories:
         if on_start:
             on_start(browser, history)

@@ -3,13 +3,16 @@ its Mark of the Web is still there."""
 
 import hashlib
 import os
+import sys
 import time
 from pathlib import Path
 
-from . import zone
+from . import marks
 
-# Browsers download into these and rename the file when it's complete
-PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".tmp", ".download", ".opdownload")
+# Browsers download into these and rename the file when it's complete; the
+# last one is wherefrom's own sidecar files
+PARTIAL_SUFFIXES = (".crdownload", ".part", ".partial", ".tmp", ".download", ".opdownload",
+                    ".wherefrom.json")
 
 
 def file_hash(path, chunk_size=1024 * 1024):
@@ -26,10 +29,33 @@ def file_hash(path, chunk_size=1024 * 1024):
     return digest.hexdigest(), size
 
 
-def downloads_folder():
-    """The user's Downloads folder (the usual place; a moved one can be
-    given with --folder)."""
-    return Path.home() / "Downloads"
+DOWNLOADS_GUID = "{374DE290-123F-4565-9164-39C4925E467B}"     # Windows' Downloads folder
+
+
+def downloads_folder(platform=None, home=None, config_home=None):
+    """The user's Downloads folder, including a moved one: Windows keeps it
+    in the registry, Linux in ~/.config/user-dirs.dirs."""
+    platform = platform or sys.platform
+    home = Path(home or Path.home())
+    if platform == "win32":
+        try:
+            import winreg
+            key = r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
+                value, _ = winreg.QueryValueEx(k, DOWNLOADS_GUID)
+            return Path(os.path.expandvars(value))
+        except (ImportError, OSError):
+            pass
+    elif platform != "darwin":
+        config = Path(config_home or os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+        try:
+            for line in (config / "user-dirs.dirs").read_text(encoding="utf-8").splitlines():
+                if line.startswith("XDG_DOWNLOAD_DIR="):
+                    value = line.split("=", 1)[1].strip().strip('"')
+                    return Path(value.replace("$HOME", str(home)))
+        except OSError:
+            pass
+    return home / "Downloads"
 
 
 class Watcher:
@@ -37,10 +63,11 @@ class Watcher:
     size and modified time in two scans in a row, so it isn't read while a
     browser is still writing it."""
 
-    def __init__(self, ledger, folders, read_mark=zone.read):
+    def __init__(self, ledger, folders, read_mark=marks.read, sidecars=False):
         self.ledger = ledger
         self.folders = [Path(f) for f in folders]
         self.read_mark = read_mark
+        self.sidecars = sidecars        # also write a .wherefrom.json next to each file
         self.pending = {}           # path -> (size, mtime) from the last scan
         # The ledger's own files change every time it records something; if
         # they're in a watched folder, reading them would never end
@@ -91,7 +118,14 @@ class Watcher:
             sha256, size = file_hash(path)
         except OSError:
             return 0                # locked or gone; try again next scan
-        added = self.ledger.add(sha256, size, path, mark=mark, source="mark")
+        added = self.ledger.add(sha256, size, path, mark=mark, source="mark",
+                                downloaded_at=marks.downloaded_at(path))
+        if self.sidecars:
+            from .portable import write_sidecar
+            try:
+                write_sidecar(path, self.ledger.by_hash(sha256)[0])
+            except OSError:
+                pass                # a read-only folder: the ledger still has it
         self.ledger.mark_seen(path, *state)
         return 1 if added else 0
 

@@ -3,7 +3,7 @@
 import os
 from dataclasses import dataclass
 
-from . import zone
+from . import marks
 from .watch import file_hash
 
 # Only these are offered as links to open; anything else is shown as text
@@ -52,7 +52,19 @@ class Finding:
         return copies
 
 
-def look_up(path, ledger, read_mark=zone.read):
+# Records that arrived in someone else's file (a sidecar, an import) could
+# claim anything, including an earlier date; they never outrank what this
+# computer learned itself, and among them, the order is when they arrived here.
+SECONDHAND = ("sidecar", "import")
+
+
+def trust_order(record):
+    if record.source in SECONDHAND:
+        return (1, record.recorded_at)
+    return (0, record.downloaded_at or record.recorded_at)
+
+
+def look_up(path, ledger, read_mark=marks.read):
     """Read the file's mark and match its contents against the ledger. A mark
     found here is also saved, so copies made later can still be traced."""
     path = os.path.abspath(path)
@@ -64,8 +76,12 @@ def look_up(path, ledger, read_mark=zone.read):
     except OSError as error:
         return Finding(path, mark, [], error=f"Can't read the file: {error.strerror or error}")
     if mark is not None and mark.has_source:
-        ledger.add(sha256, size, path, mark=mark, source="mark")
-    return Finding(path, mark, ledger.by_hash(sha256))
+        ledger.add(sha256, size, path, mark=mark, source="mark", downloaded_at=marks.downloaded_at(path))
+    # A sidecar that came along with the file (only if its SHA-256 matches)
+    from .portable import add_entry, sidecars_for
+    for entry in sidecars_for(path, sha256):
+        add_entry(ledger, entry, "sidecar", path=path)
+    return Finding(path, mark, sorted(ledger.by_hash(sha256), key=trust_order))
 
 
 def openable(url):
