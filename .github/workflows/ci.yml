@@ -34,11 +34,19 @@ jobs:
       - name: Install
         run: pip install pytest
 
+      - name: Install a browser for the extension test (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
       - name: Run tests
         shell: bash
         run: |
           set -o pipefail
-          python -m pytest -v -rs 2>&1 | tee test-output.txt
+          # On Linux, a virtual display lets the window and real-browser tests run
+          if [ "$RUNNER_OS" = "Linux" ]; then run="xvfb-run -a"; else run=""; fi
+          $run python -m pytest -v -rs 2>&1 | tee test-output.txt
 
       - name: Post the test summary
         if: always()
@@ -72,8 +80,9 @@ jobs:
         shell: bash
         run: |
           pip install pyinstaller==6.22.3
-          pyinstaller --onefile --name wherefrom --paths . packaging/entry.py
-          pyinstaller --onefile --noconsole --name wherefromw --paths . packaging/entry.py
+          # The browser extension's files travel inside the programs
+          pyinstaller --onefile --name wherefrom --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
+          pyinstaller --onefile --noconsole --name wherefromw --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
 
       - name: Check the built program
         shell: pwsh

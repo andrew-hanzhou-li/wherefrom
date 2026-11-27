@@ -89,6 +89,35 @@ def cmd_scan(args, ledger):
     return 0
 
 
+def cmd_native_host(args, ledger):
+    # Started by the browser; stdin/stdout carry the extension's messages,
+    # so nothing else may be printed here.
+    from . import native
+    return native.serve(ledger=ledger)
+
+
+def cmd_browser(args, ledger):
+    from . import native
+    if args.action == "remove":
+        for item in native.remove():
+            print(f"Removed {item}")
+        print("Remove the extension itself from the browser's extensions page.")
+        return 0
+    summary = native.setup(extra_ids=args.extension_id or ())
+    folders = summary["extensions"]
+    print("wherefrom can now receive downloads from its browser extension.")
+    if not summary["registered"]:
+        print("No supported browser was found for this user; install one and run this again.")
+    print()
+    print("Chrome, Edge, Brave, Vivaldi: open the extensions page (e.g. chrome://extensions),")
+    print("turn on Developer mode, choose \"Load unpacked\" and pick:")
+    print(f"  {folders['chromium']}")
+    print("Firefox: open about:debugging > This Firefox > Load Temporary Add-on and pick")
+    print(f"  {folders['firefox'] / 'manifest.json'}")
+    print("(Firefox removes unsigned add-ons when it restarts; see the README to keep it.)")
+    return 0
+
+
 def cmd_app(args, ledger):
     from . import app
     app.run(ledger)
@@ -199,6 +228,16 @@ def build_parser():
                                  help="also write a .wherefrom.json next to each new file, so its "
                                       "source travels with it")
         command.set_defaults(run=run)
+
+    browser = sub.add_parser("browser", help="set up (or remove) the browser extension's connection")
+    browser.add_argument("action", choices=["setup", "remove"])
+    browser.add_argument("--extension-id", action="append",
+                         help="also allow this Chromium extension ID (e.g. after publishing it to a store)")
+    browser.set_defaults(run=cmd_browser)
+
+    host = sub.add_parser("native-host", help="(started by the browser extension; not for typing)")
+    host.add_argument("browser_args", nargs=argparse.REMAINDER)     # what the browser passes; unused
+    host.set_defaults(run=cmd_native_host)
 
     window = sub.add_parser("app", help="a window to browse and search everything recorded")
     window.set_defaults(run=cmd_app)

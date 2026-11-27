@@ -25,5 +25,8 @@ wherefromw = "wherefrom.cli:main"
 [tool.setuptools]
 packages = ["wherefrom"]
 
+[tool.setuptools.package-data]
+wherefrom = ["extension/*.js", "extension/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
