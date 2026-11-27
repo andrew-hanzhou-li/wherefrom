@@ -28,12 +28,26 @@ def rows_for(finding):
     return rows
 
 
+def new_window(attempts=3, pause=0.3):
+    """tk.Tk(), tried again briefly if Tcl can't read its own init.tcl: on
+    Windows that read can fail for a moment (seen while antivirus scans a
+    freshly installed Python). Any other error is raised at once."""
+    import time
+    import tkinter as tk
+    for attempt in range(attempts):
+        try:
+            return tk.Tk()
+        except tk.TclError as error:
+            if "init.tcl" not in str(error) or attempt == attempts - 1:
+                raise
+            time.sleep(pause)
+
+
 def show(finding):
     # Imported here so the rest of wherefrom works on Pythons without Tk
-    import tkinter as tk
     from tkinter import ttk
 
-    root = tk.Tk()
+    root = new_window()
     root.title("Where did this come from?")
     root.minsize(520, 0)
     style = ttk.Style(root)

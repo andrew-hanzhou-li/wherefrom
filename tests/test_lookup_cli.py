@@ -168,3 +168,21 @@ def test_output_to_an_old_code_page_does_not_crash(tmp_path, monkeypatch):
     assert cli.main(["show", str(f)]) == 0
     sys.stdout.flush()
     assert b"https://??.jp/x.pdf" in raw.getvalue()
+
+
+def test_new_window_retries_only_the_init_tcl_hiccup(monkeypatch):
+    tkinter = pytest.importorskip("tkinter")
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 3:
+            raise tkinter.TclError("Can't find a usable init.tcl in the following directories")
+        return "window"
+    monkeypatch.setattr(tkinter, "Tk", flaky)
+    assert gui.new_window(pause=0) == "window" and len(calls) == 3
+
+    calls.clear()
+    monkeypatch.setattr(tkinter, "Tk", lambda: (_ for _ in ()).throw(tkinter.TclError("no display name")))
+    with pytest.raises(tkinter.TclError, match="no display"):
+        gui.new_window(pause=0)

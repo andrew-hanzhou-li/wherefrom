@@ -84,7 +84,8 @@ def run(ledger):
     import tkinter as tk
     from tkinter import ttk
 
-    root = tk.Tk()
+    from .gui import new_window
+    root = new_window()
     root.title("wherefrom")
     root.geometry("980x620")
     root.minsize(640, 420)
