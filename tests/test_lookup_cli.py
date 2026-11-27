@@ -182,6 +182,16 @@ def test_new_window_retries_only_the_init_tcl_hiccup(monkeypatch):
     monkeypatch.setattr(tkinter, "Tk", flaky)
     assert gui.new_window(pause=0) == "window" and len(calls) == 3
 
+    # The same hiccup when init.tcl was only partly read (seen on CI's Windows)
+    calls.clear()
+    def half_read():
+        calls.append(1)
+        if len(calls) < 2:
+            raise tkinter.TclError('invalid command name "tcl_findLibrary"')
+        return "window"
+    monkeypatch.setattr(tkinter, "Tk", half_read)
+    assert gui.new_window(pause=0) == "window" and len(calls) == 2
+
     calls.clear()
     monkeypatch.setattr(tkinter, "Tk", lambda: (_ for _ in ()).throw(tkinter.TclError("no display name")))
     with pytest.raises(tkinter.TclError, match="no display"):
