@@ -150,6 +150,7 @@ Some tests need a particular system (Windows streams and registry, macOS attribu
 2. Merge to `main`, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`.
 3. CI tests, builds and publishes a GitHub Release with `wherefrom-setup.exe`, `wherefrom.exe`, `wherefromw.exe`, the two store packages and `SHA256SUMS.txt`. It refuses a tag that doesn't match the version. The installer keeps its name in every release, so the README's download link always gets the newest one.
 4. Upload the store packages to the stores (see [docs/store-listing.md](docs/store-listing.md)).
+5. PyPI, a signed Firefox add-on and winget updates can each run by themselves on every release once set up; see [docs/distribution.md](docs/distribution.md).
 
 ## License
 

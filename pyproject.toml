@@ -10,11 +10,24 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "andrew-hanzhou-li" }]
+keywords = ["downloads", "provenance", "mark-of-the-web", "file-history", "browser-extension"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
     "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
     "Environment :: Win32 (MS Windows)",
+    "Programming Language :: Python :: 3",
     "Topic :: Desktop Environment :: File Managers",
+    "Topic :: Utilities",
 ]
+
+[project.urls]
+Homepage = "https://github.com/andrew-hanzhou-li/wherefrom"
+Download = "https://github.com/andrew-hanzhou-li/wherefrom/releases/latest"
+Issues = "https://github.com/andrew-hanzhou-li/wherefrom/issues"
+Privacy = "https://github.com/andrew-hanzhou-li/wherefrom/blob/main/PRIVACY.md"
 
 [project.scripts]
 wherefrom = "wherefrom.cli:main"
