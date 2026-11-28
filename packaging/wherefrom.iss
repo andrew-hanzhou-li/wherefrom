@@ -1,5 +1,6 @@
 ; The Windows installer: wherefrom-setup.exe. Built by CI with Inno Setup:
-;   iscc /DAppVersion=0.3.0 /DDistDir=<folder with the two .exe files> /O<output folder> packaging\wherefrom.iss
+;   pyinstaller packaging\wherefrom.spec --distpath dist\app      (the folder build)
+;   iscc /DAppVersion=0.4.0 /DDistDir=dist\app\wherefrom /O<output folder> packaging\wherefrom.iss
 ;
 ; Per user, no admin rights. It installs the two programs, runs
 ; "wherefrom setup" (menu entry, start at sign-in, browser connection), then
@@ -11,7 +12,7 @@
   #error Pass the version: /DAppVersion=x.y.z
 #endif
 #ifndef DistDir
-  #define DistDir "..\dist"
+  #define DistDir "..\dist\app\wherefrom"
 #endif
 
 [Setup]
@@ -38,9 +39,13 @@ WizardStyle=modern
 Compression=lzma2
 SolidCompression=yes
 
+[InstallDelete]
+; The libraries are replaced as a whole, so an upgrade never mixes old and new ones
+Type: filesandordirs; Name: "{app}\_internal"
+
 [Files]
-Source: "{#DistDir}\wherefrom.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#DistDir}\wherefromw.exe"; DestDir: "{app}"; Flags: ignoreversion
+; The folder build: wherefrom.exe, wherefromw.exe and their shared _internal folder
+Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\wherefrom"; Filename: "{app}\wherefromw.exe"; Parameters: "app"; Comment: "Browse and search where your downloads came from"

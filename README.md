@@ -73,6 +73,14 @@ The installer (or `wherefrom setup`) has already connected your browsers. To add
 - **Chrome, Edge, Brave, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick `%LOCALAPPDATA%\wherefrom\browser\extension-chromium` (Windows) or the folder `wherefrom browser setup` prints.
 - **Firefox:** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick `manifest.json` in the `extension-firefox` folder next to it. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
 
+Its toolbar button shows whether it's working:
+
+- **Recording downloads**: connected to wherefrom. The popup lists recent downloads and whether each was recorded.
+- **A red !**: wherefrom isn't reachable. The popup says why and how to fix it (install wherefrom, or run the one command it shows). Downloads made meanwhile wait in the extension for up to 14 days and are recorded once wherefrom answers.
+- **off**: paused. Use the switch in the popup to stop and restart recording.
+
+To never record certain sites (your bank, say), add them under **Sites not recorded** in the popup, or click **Don't record this site** next to a recent download. A site covers its subdomains, and a download counts as from that site if its link or the page it came from is on it.
+
 It sends only finished downloads to wherefrom on your own computer, never anything about the pages you visit, and nothing from private or incognito windows. `wherefrom browser remove` undoes the connection. See [PRIVACY.md](PRIVACY.md).
 
 ## Commands
@@ -134,7 +142,7 @@ python -m pytest
 
 `python packaging/build_extension.py` builds the extension's store packages into `dist/extension`; `python packaging/make_icons.py` redraws its icons (needs Pillow). `python packaging/make_social_preview.py` redraws `docs/social-preview.png`, the card shown when the repository's link is shared.
 
-Some tests need a particular system (Windows streams and registry, macOS attributes) or a display; they run in CI on Windows, macOS and Linux. `tests/test_extension_e2e.py` drives a real Chromium with the extension loaded (it needs Python Playwright and a display).
+Some tests need a particular system (Windows streams and registry, macOS attributes) or a display; they run in CI on Windows, macOS and Linux. `tests/test_extension_e2e.py` drives a real Chromium with the extension loaded (it needs Python Playwright and a display). The extension's own logic has JavaScript tests in `tests/extension/` (`node --test tests/extension/logic.test.js`); pytest runs them when Node is installed.
 
 ## Releasing
 

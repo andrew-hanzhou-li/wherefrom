@@ -37,7 +37,9 @@ MAX_MESSAGE = 1024 * 1024
 MAX_TEXT = 8192
 # The extension's files besides its manifest, which differs per browser family
 EXTENSION_ICONS = tuple(f"icons/icon-{size}.png" for size in (16, 32, 48, 128))
-EXTENSION_FILES = ("background.js", *EXTENSION_ICONS)
+EXTENSION_FILES = ("background.js", "logic.js", "common.js", "ui.css",
+                   "popup.html", "popup.css", "popup.js",
+                   "welcome.html", "welcome.css", "welcome.js", *EXTENSION_ICONS)
 
 # Where Chromium browsers look for host manifests, per system
 WINDOWS_KEYS = {
@@ -102,7 +104,11 @@ def browser_time(value):
 
 
 def handle(message, ledger):
-    """Record one finished download. Returns the reply for the extension."""
+    """Answer one message: "ping" (is wherefrom there, which version) or
+    "download" (record one finished download). Returns the reply."""
+    if isinstance(message, dict) and message.get("type") == "ping":
+        from . import __version__
+        return {"ok": True, "version": __version__}
     if not isinstance(message, dict) or message.get("type") != "download":
         return {"ok": False, "error": "unknown message"}
     path = text(message.get("path"))

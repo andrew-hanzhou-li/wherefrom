@@ -52,6 +52,12 @@ def test_a_download_is_recorded(tmp_path, ledger):
     assert record.downloaded_at == local.isoformat(timespec="seconds")
 
 
+def test_ping_says_wherefrom_is_there(ledger):
+    from wherefrom import __version__
+    assert native.handle({"type": "ping"}, ledger) == {"ok": True, "version": __version__}
+    assert ledger.all_records() == []                       # and records nothing
+
+
 def test_bad_messages_are_refused(tmp_path, ledger):
     f = tmp_path / "f.zip"
     f.write_bytes(b"zip")

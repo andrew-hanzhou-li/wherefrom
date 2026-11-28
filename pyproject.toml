@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wherefrom"
-version = "0.3.0"
+version = "0.4.0"
 description = "Remember where your downloaded files came from, even after they're copied or renamed."
 readme = "README.md"
 license = "MIT"

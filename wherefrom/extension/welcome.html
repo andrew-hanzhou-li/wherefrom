@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome to wherefrom</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="welcome.css">
+</head>
+<body>
+<main>
+  <header>
+    <img class="logo" src="icons/icon-128.png" alt="" width="64" height="64">
+    <div>
+      <h1>One more step: install wherefrom</h1>
+      <p class="lede">This extension tells the <strong>wherefrom</strong> program on your computer where each download came from. wherefrom keeps the record, and shows it when you right-click a file and choose <em>Where did this come from?</em></p>
+    </div>
+  </header>
+
+  <section id="status" class="status" aria-live="polite">
+    <p class="title"><span class="dot"></span><span>Checking…</span></p>
+  </section>
+
+  <ol class="steps">
+    <li>
+      <h2>Install wherefrom</h2>
+      <p id="install-text">It's free and open source, and needs no admin rights.</p>
+      <p><a id="install-link" class="btn primary" href="https://github.com/andrew-hanzhou-li/wherefrom#install" target="_blank" rel="noopener">Get wherefrom</a></p>
+    </li>
+    <li>
+      <h2>Come back here</h2>
+      <p>This page notices on its own once wherefrom is installed, or use <em>Check again</em> above. Downloads you make in the meantime wait in the extension and are recorded then.</p>
+    </li>
+  </ol>
+
+  <section class="privacy">
+    <h2>What the extension sees</h2>
+    <p>Only finished downloads: the file's location on your computer, the link it came from, the page that link was on, its type and size. Never the pages you visit, and nothing from private windows. It's sent only to wherefrom on this computer; nothing goes over the internet. You can pause it or skip sites from the toolbar button.</p>
+  </section>
+</main>
+<script src="logic.js"></script>
+<script src="common.js"></script>
+<script src="welcome.js"></script>
+</body>
+</html>

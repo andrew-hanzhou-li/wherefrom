@@ -43,11 +43,22 @@ jobs:
 
       - name: Run tests
         shell: bash
+        env:
+          # The browser test saves its screenshots of the popup and welcome page here
+          WHEREFROM_SCREENSHOTS: ${{ runner.temp }}/screenshots
         run: |
           set -o pipefail
           # On Linux, a virtual display lets the window and real-browser tests run
           if [ "$RUNNER_OS" = "Linux" ]; then run="xvfb-run -a"; else run=""; fi
           $run python -m pytest -v -rs 2>&1 | tee test-output.txt
+
+      - name: Keep the extension screenshots
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension-screenshots
+          path: ${{ runner.temp }}/screenshots
+          if-no-files-found: ignore
 
       - name: Post the test summary
         if: always()
@@ -88,6 +99,8 @@ jobs:
           # The browser extension's files travel inside the programs
           pyinstaller --onefile --icon packaging/wherefrom.ico --name wherefrom --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
           pyinstaller --onefile --noconsole --icon packaging/wherefrom.ico --name wherefromw --paths . --add-data "wherefrom/extension;wherefrom/extension" packaging/entry.py
+          # The folder build the installer ships: starts much faster (nothing to unpack first)
+          pyinstaller --noconfirm --workpath build/folder --distpath dist/app packaging/wherefrom.spec
 
       - name: Check the built program
         shell: pwsh
@@ -125,13 +138,16 @@ jobs:
           if (-not $iscc) { throw "Inno Setup's compiler (ISCC.exe) wasn't found" }
           Write-Output "Using $($iscc.FullName)"
           $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
-          & $iscc.FullName "/DAppVersion=$version" "/DDistDir=$PWD\dist" "/O$PWD\dist" packaging\wherefrom.iss
+          & $iscc.FullName "/DAppVersion=$version" "/DDistDir=$PWD\dist\app\wherefrom" "/O$PWD\dist" packaging\wherefrom.iss
           if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
 
       - name: Install, upgrade and uninstall it
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
+          $expected = python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])"
           $app = "$env:LOCALAPPDATA\Programs\wherefrom"
           $menu = "HKCU:\Software\Classes\*\shell\wherefrom\command"
           $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
@@ -145,9 +161,9 @@ jobs:
             }
           }
           function Watchers { @(Get-Process wherefromw -ErrorAction SilentlyContinue).Count }
-          function Install-Once([string]$log) {
+          function Install-Once([string]$log, [string]$setup = "dist\wherefrom-setup.exe") {
             # -PassThru + WaitForExit: -Wait would also wait for the watcher it starts, forever
-            $p = Start-Process dist\wherefrom-setup.exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$log" -PassThru
+            $p = Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=$log" -PassThru
             $null = $p.Handle       # without this, ExitCode can come back empty
             $p.WaitForExit()
             if ($p.ExitCode -ne 0) { Get-Content $log -Tail 30; throw "the installer exited with $($p.ExitCode)" }
@@ -169,23 +185,68 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "--version failed" }
             Write-Output "Installed: $version"
           }
+          function Check-ThisVersion {
+            $version = & "$app\wherefrom.exe" --version
+            if ($version -ne "wherefrom $expected") { throw "expected wherefrom $expected, got $version" }
+            if (-not (Test-Path "$app\_internal")) { throw "the folder build's _internal is missing" }
+            # The installed program reads a real Mark of the Web
+            $file = "$env:RUNNER_TEMP\installed-check.pdf"
+            Set-Content -Path $file -Value "installed check $(Get-Random)"
+            Set-Content -Path $file -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3`r`nHostUrl=https://example.com/installed.pdf"
+            $out = & "$app\wherefrom.exe" show $file | Out-String
+            if ($out -notmatch "https://example.com/installed.pdf") { throw "the installed program didn't read the mark: $out" }
+            # The browser's way in: a framed "ping" through the installed helper, as Chrome sends it
+            $bat = "$env:LOCALAPPDATA\wherefrom\browser\wherefrom-host.bat"
+            $psi = [Diagnostics.ProcessStartInfo]::new("cmd.exe", "/d /c `"`"$bat`" chrome-extension://oihchieldoakdhphjlofnphcpmmiooka/`"")
+            $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.UseShellExecute = $false
+            $h = [Diagnostics.Process]::Start($psi)
+            $body = [Text.Encoding]::UTF8.GetBytes('{"type":"ping"}')
+            $h.StandardInput.BaseStream.Write([BitConverter]::GetBytes([int]$body.Length), 0, 4)
+            $h.StandardInput.BaseStream.Write($body, 0, $body.Length)
+            $h.StandardInput.Close()
+            $buffer = [IO.MemoryStream]::new()
+            $h.StandardOutput.BaseStream.CopyTo($buffer)
+            $h.WaitForExit()
+            $bytes = $buffer.ToArray()
+            if ($bytes.Length -lt 4) { throw "the browser helper didn't answer" }
+            $reply = [Text.Encoding]::UTF8.GetString($bytes, 4, [BitConverter]::ToInt32($bytes, 0)) | ConvertFrom-Json
+            if (-not $reply.ok -or $reply.version -ne $expected) { throw "the browser helper answered: $($reply | ConvertTo-Json -Compress)" }
+            # How fast it starts, against the single-file program (median of 3 warm runs)
+            function Median-Start([string]$exe) {
+              & $exe --version | Out-Null
+              $times = 1..3 | ForEach-Object { (Measure-Command { & $exe --version | Out-Null }).TotalSeconds } | Sort-Object
+              return $times[1]
+            }
+            $installed = Median-Start "$app\wherefrom.exe"
+            $single = Median-Start "dist\wherefrom.exe"
+            Write-Output ("::notice::Startup: installed folder build {0:N2} s, single-file program {1:N2} s" -f $installed, $single)
+            if ($installed -gt 2) { throw ("the installed program took {0:N2} s to start" -f $installed) }
+          }
 
+          # Start from the last release, as most people will
+          gh release download v0.3.0 --repo $env:GITHUB_REPOSITORY --pattern wherefrom-setup.exe --dir "$env:RUNNER_TEMP\old"
+          Install-Once "$env:RUNNER_TEMP\old-install.log" "$env:RUNNER_TEMP\old\wherefrom-setup.exe"
+          Check-Installed
+          # Upgrade it to this build
           Install-Once "$env:RUNNER_TEMP\install.log"
           Check-Installed
-          # Again, over the running watcher: an upgrade
+          Check-ThisVersion
+          # Again, over the running watcher
           Install-Once "$env:RUNNER_TEMP\upgrade.log"
           Check-Installed
+          Check-ThisVersion
 
           # The uninstaller copies itself to TEMP and returns at once, so wait for its work
           $u = Start-Process "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -PassThru
           $u.WaitForExit()
           Wait-Until "the uninstaller to finish" { -not (Test-Path -LiteralPath $entry) -and -not (Test-Path "$app\wherefrom.exe") } 120
+          Wait-Until "the program folder to be removed" { -not (Test-Path "$app\_internal") } 60
           Wait-Until "the watcher to stop" { (Watchers) -eq 0 }
           if (Test-Path -LiteralPath $menu) { throw "menu entry left behind" }
           if ((Get-ItemProperty -LiteralPath $run).PSObject.Properties.Name -contains "wherefrom") { throw "start at sign-in left behind" }
           if (Test-Path -LiteralPath $hostKey) { throw "browser connection left behind" }
           if (-not (Test-Path "$env:LOCALAPPDATA\wherefrom\ledger.sqlite3")) { throw "the database should be kept" }
-          Write-Output "::notice::wherefrom-setup.exe installed, upgraded over a running watcher, and uninstalled cleanly"
+          Write-Output "::notice::wherefrom-setup.exe upgraded v0.3.0, upgraded again over a running watcher, answered the browser's ping, and uninstalled cleanly"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -208,6 +269,25 @@ jobs:
 
       - name: Build the store packages
         run: python packaging/build_extension.py dist/extension
+
+      - name: Check the Firefox package with Mozilla's linter (what addons.mozilla.org runs)
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          mkdir -p "$RUNNER_TEMP/firefox"
+          unzip -q "dist/extension/wherefrom-firefox-$version.zip" -d "$RUNNER_TEMP/firefox"
+          npx --yes web-ext@8 lint --source-dir "$RUNNER_TEMP/firefox" --output json --pretty > lint.json || true
+          python3 - <<'PY'
+          import json
+          report = json.load(open("lint.json"))
+          for kind in ("errors", "warnings", "notices"):
+              for m in report.get(kind, []):
+                  level = "error" if kind == "errors" else "warning" if kind == "warnings" else "notice"
+                  print(f"::{level}::web-ext {m.get('code')}: {m.get('message')} ({m.get('file', '')})")
+          print("summary:", report.get("summary"))
+          raise SystemExit(1 if report.get("errors") else 0)
+          PY
 
       - uses: actions/upload-artifact@v7
         with:

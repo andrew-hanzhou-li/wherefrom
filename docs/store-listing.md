@@ -46,6 +46,8 @@ Text to paste into each store's forms, and the steps around it. The packages com
 
 - `downloads`: To notice when a download finishes and read its link, referrer, file path, type and size. Nothing is changed or started.
 - `nativeMessaging`: To pass each finished download's details to the wherefrom program installed on the same computer. This is the only place they go.
+- `storage`: To keep the user's settings (paused, sites not to record), the last 8 downloads shown in the popup, and downloads waiting while the wherefrom program can't be reached. All on the user's computer; nothing is synced.
+- `alarms`: To retry sending waiting downloads later (after 1, 5, 30 and then every 120 minutes) when the wherefrom program wasn't reachable.
 
 **Remote code:** No, I am not using remote code.
 
@@ -53,7 +55,7 @@ Text to paste into each store's forms, and the steps around it. The packages com
 
 **Notes for the reviewer:**
 
-> The extension works together with the open-source desktop program wherefrom (https://github.com/andrew-hanzhou-li/wherefrom), through native messaging. Without the program it does nothing and logs one console warning per download. To test it on Windows: run wherefrom-setup.exe from the latest GitHub release, then in a terminal `%LOCALAPPDATA%\Programs\wherefrom\wherefrom.exe browser setup --extension-id <this item's ID>`, download any file, and run `wherefrom.exe search <site>` from the same folder. The download is listed with "Known from: the wherefrom browser extension". The code is one unminified file, background.js.
+> The extension works together with the open-source desktop program wherefrom (https://github.com/andrew-hanzhou-li/wherefrom), through native messaging. Without the program it opens a welcome page explaining how to install it, its toolbar button shows a red "!", and finished downloads wait in the extension's storage until the program answers. To test it on Windows: run wherefrom-setup.exe from the latest GitHub release, then in a terminal `%LOCALAPPDATA%\Programs\wherefrom\wherefrom.exe browser setup --extension-id <this item's ID>`, download any file, and run `wherefrom.exe search <site>` from the same folder. The download is listed with "Known from: the wherefrom browser extension", and the toolbar popup shows it as "Recorded". All code is plain, unminified JavaScript in the package (background.js, logic.js, common.js, popup.js, welcome.js); nothing is loaded from the internet.
 
 ## Firefox Add-ons
 
