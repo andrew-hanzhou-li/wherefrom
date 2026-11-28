@@ -7,18 +7,16 @@ var WherefromUI = (function () {
   var REPO = "https://github.com/andrew-hanzhou-li/wherefrom";
   var SETUP_EXE = REPO + "/releases/latest/download/wherefrom-setup.exe";
 
+  // Promise forms only: Firefox's `browser.*` takes no callbacks, and
+  // Chrome's MV3 `chrome.*` returns promises when given none.
   function ask(message) {
-    return new Promise(function (resolve) {
-      try {
-        var result = api.runtime.sendMessage(message, function (reply) {
-          void (api.runtime.lastError);           // read it so Chrome doesn't log it
-          resolve(reply || { ok: false });
-        });
-        if (result && typeof result.then === "function") result.then(resolve, function () { resolve({ ok: false }); });
-      } catch (e) {
-        resolve({ ok: false });
-      }
-    });
+    try {
+      return api.runtime.sendMessage(message).then(
+        function (reply) { return reply || { ok: false }; },
+        function () { return { ok: false }; });
+    } catch (e) {
+      return Promise.resolve({ ok: false });
+    }
   }
 
   function el(tag, attrs, children) {
@@ -44,16 +42,14 @@ var WherefromUI = (function () {
 
   /** Where to get wherefrom on this system: the installer on Windows, the README elsewhere. */
   function installTarget() {
-    return new Promise(function (resolve) {
-      var fallback = { href: REPO + "#install", label: "Get wherefrom", windows: false };
-      try {
-        var done = function (info) {
-          resolve(info && info.os === "win" ? { href: SETUP_EXE, label: "Download wherefrom for Windows", windows: true } : fallback);
-        };
-        var result = api.runtime.getPlatformInfo(done);
-        if (result && typeof result.then === "function") result.then(done, function () { resolve(fallback); });
-      } catch (e) { resolve(fallback); }
-    });
+    var fallback = { href: REPO + "#install", label: "Get wherefrom", windows: false };
+    try {
+      return api.runtime.getPlatformInfo().then(function (info) {
+        return info && info.os === "win" ? { href: SETUP_EXE, label: "Download wherefrom for Windows", windows: true } : fallback;
+      }, function () { return fallback; });
+    } catch (e) {
+      return Promise.resolve(fallback);
+    }
   }
 
   /** Fill `box` (a .status element) for this status; `onCheck` runs "Check again". */
@@ -97,10 +93,11 @@ var WherefromUI = (function () {
   }
 
   function read(keys) {
-    return new Promise(function (resolve) {
-      var result = api.storage.local.get(keys, resolve);
-      if (result && typeof result.then === "function") result.then(resolve, function () { resolve({}); });
-    });
+    try {
+      return api.storage.local.get(keys).then(function (data) { return data || {}; }, function () { return {}; });
+    } catch (e) {
+      return Promise.resolve({});
+    }
   }
 
   return { api: api, ask: ask, el: el, renderStatus: renderStatus, installTarget: installTarget, read: read, REPO: REPO };

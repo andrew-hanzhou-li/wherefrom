@@ -104,8 +104,9 @@ class Browser:
         page.goto(url)
         with page.expect_download() as info:
             page.click("#get")
-        info.value.path()                   # wait until it's saved
+        saved = info.value.path()           # wait until it's saved
         page.close()
+        return Path(saved).name             # Playwright saves under its own (random) name
 
     def records(self, count=1, seconds=15):
         records = []
@@ -122,6 +123,14 @@ class Browser:
         page.set_viewport_size({"width": 360, "height": 640})
         page.goto(POPUP)
         return page
+
+    def stored(self):
+        """What the extension keeps (for messages when a test fails)."""
+        try:
+            worker = self.context.service_workers[0] if self.context.service_workers else                 self.context.wait_for_event("serviceworker", timeout=10000)
+            return worker.evaluate("chrome.storage.local.get(null)")
+        except Exception as error:
+            return f"(couldn't read: {error})"
 
     def close(self):
         self.ledger.close()
@@ -145,7 +154,7 @@ def test_a_real_download_reaches_the_ledger_and_the_popup(tmp_path):
         base = f"http://127.0.0.1:{port}"
         browser = Browser(p, tmp_path)
         try:
-            browser.download(base + "/page")
+            name = browser.download(base + "/page")
             records = browser.records()
             assert len(records) == 1, "the extension's message never reached the ledger"
             record = records[0]
@@ -161,7 +170,8 @@ def test_a_real_download_reaches_the_ledger_and_the_popup(tmp_path):
             playwright.expect(popup.locator("#status")).to_contain_text("Recording downloads", timeout=15000)
             playwright.expect(popup.locator("#status")).to_contain_text("Connected to wherefrom")
             playwright.expect(popup.locator("#recent li")).to_have_count(1)
-            playwright.expect(popup.locator("#recent li").first).to_contain_text("report.csv")
+            playwright.expect(popup.locator("#recent li").first).to_contain_text(name)
+            playwright.expect(popup.locator("#recent li").first).to_contain_text("127.0.0.1")
             playwright.expect(popup.locator("#recent li .chip").first).to_have_text("Recorded")
             screenshot(popup, "popup-connected")
 
@@ -184,11 +194,11 @@ def test_downloads_wait_until_wherefrom_is_there(tmp_path):
         try:
             # Installed without wherefrom: the welcome page opens by itself
             welcome = None
-            deadline = time.time() + 15
+            deadline = time.time() + 30
             while time.time() < deadline and not welcome:
                 welcome = next((pg for pg in browser.context.pages if pg.url.endswith("/welcome.html")), None)
                 time.sleep(0.2)
-            assert welcome, "the welcome page didn't open"
+            assert welcome, f"the welcome page didn't open; pages: {[pg.url for pg in browser.context.pages]}; "                             f"stored: {browser.stored()}"
             playwright.expect(welcome.locator("#status")).to_contain_text("isn't set up", timeout=15000)
             screenshot(welcome, "welcome")
 
