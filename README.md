@@ -41,7 +41,7 @@ wherefrom also covers what you downloaded before installing it: setup reads the 
 It needs no admin rights and sets everything up:
 
 - **Where did this come from?** in the right-click menu of every file (on Windows 11 under **Show more options**);
-- the download history of Chrome, Edge, Brave, Vivaldi, Chromium and Firefox, read in the background, so files you downloaded before are covered too;
+- the download history of Chrome, Edge, Brave, Opera, Vivaldi, Chromium, Firefox, LibreWolf, Waterfox, Floorp and Zen, read in the background, so files you downloaded before are covered too;
 - the watcher, which records new downloads from now on and starts again when you sign in;
 - **wherefrom** in the Start menu, a window to browse and search everything recorded.
 
@@ -70,8 +70,8 @@ You don't need it: wherefrom already reads what the browser records. The extensi
 
 The installer (or `wherefrom setup`) has already connected your browsers. To add the extension itself:
 
-- **Chrome, Edge, Brave, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick `%LOCALAPPDATA%\wherefrom\browser\extension-chromium` (Windows) or the folder `wherefrom browser setup` prints.
-- **Firefox:** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick `manifest.json` in the `extension-firefox` folder next to it. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
+- **Chrome, Edge, Brave, Opera, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick `%LOCALAPPDATA%\wherefrom\browser\extension-chromium` (Windows) or the folder `wherefrom browser setup` prints.
+- **Firefox (and LibreWolf, Waterfox, Floorp, Zen):** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick `manifest.json` in the `extension-firefox` folder next to it. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
 
 Its toolbar button shows whether it's working:
 

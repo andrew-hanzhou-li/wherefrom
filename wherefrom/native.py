@@ -224,7 +224,10 @@ def manifest_dirs(platform, home):
         support = Path(home) / "Library" / "Application Support"
         return {kind: [support / d / "NativeMessagingHosts" for d in dirs] for kind, dirs in MAC_DIRS.items()}
     linux = {kind: [linux_path(home, d) / "NativeMessagingHosts" for d in dirs] for kind, dirs in LINUX_DIRS.items()}
-    linux["firefox"] = [Path(home) / ".mozilla" / "native-messaging-hosts"]
+    # Firefox, and browsers built on it that look in their own folder (only
+    # used where that browser's folder exists, like every entry here)
+    linux["firefox"] = [Path(home) / folder / "native-messaging-hosts"
+                        for folder in (".mozilla", ".librewolf", ".waterfox", ".floorp", ".zen")]
     return linux
 
 

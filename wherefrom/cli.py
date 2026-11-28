@@ -118,7 +118,7 @@ def cmd_browser(args, ledger):
     if not summary["registered"]:
         print("No supported browser was found for this user; install one and run this again.")
     print()
-    print("Chrome, Edge, Brave, Vivaldi: open the extensions page (e.g. chrome://extensions),")
+    print("Chrome, Edge, Brave, Opera, Vivaldi: open the extensions page (e.g. chrome://extensions),")
     print("turn on Developer mode, choose \"Load unpacked\" and pick:")
     print(f"  {folders['chromium']}")
     print("Firefox: open about:debugging > This Firefox > Load Temporary Add-on and pick")
@@ -164,7 +164,7 @@ def cmd_import(args, ledger):
         print(f"Reading {browser} ({history.parent.name})...", flush=True)
     results = browsers.import_all(ledger, on_start=reading)
     if not results:
-        print("No browser history found (Chrome, Edge, Brave, Vivaldi or Firefox).")
+        print("No browser history found (Chrome, Edge, Brave, Opera, Vivaldi, Firefox and others).")
         return 1
     for browser, history, total, new in results:
         if total is None:

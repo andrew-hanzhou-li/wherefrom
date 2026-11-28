@@ -124,11 +124,22 @@ class Browser:
         page.goto(POPUP)
         return page
 
+    def worker(self):
+        if self.context.service_workers:
+            return self.context.service_workers[0]
+        return self.context.wait_for_event("serviceworker", timeout=10000)
+
+    def open_tabs(self, page):
+        """This extension's pages open in tabs, asked of Chrome itself:
+        Playwright doesn't list tabs an extension opens on its own."""
+        return self.worker().evaluate(
+            "chrome.runtime.getContexts({contextTypes: ['TAB']}).then(cs => cs.map(c => c.documentUrl))"
+            f".then(urls => urls.filter(u => u && u.endsWith('/{page}')))")
+
     def stored(self):
         """What the extension keeps (for messages when a test fails)."""
         try:
-            worker = self.context.service_workers[0] if self.context.service_workers else                 self.context.wait_for_event("serviceworker", timeout=10000)
-            return worker.evaluate("chrome.storage.local.get(null)")
+            return self.worker().evaluate("chrome.storage.local.get(null)")
         except Exception as error:
             return f"(couldn't read: {error})"
 
@@ -165,7 +176,7 @@ def test_a_real_download_reaches_the_ledger_and_the_popup(tmp_path):
             assert record.mime == "text/csv"
 
             # Connected at install: no welcome tab
-            assert not [pg for pg in browser.context.pages if pg.url.endswith("/welcome.html")]
+            assert browser.open_tabs("welcome.html") == []
             popup = browser.popup()
             playwright.expect(popup.locator("#status")).to_contain_text("Recording downloads", timeout=15000)
             playwright.expect(popup.locator("#status")).to_contain_text("Connected to wherefrom")
@@ -193,12 +204,15 @@ def test_downloads_wait_until_wherefrom_is_there(tmp_path):
         browser = Browser(p, tmp_path, connected=False)
         try:
             # Installed without wherefrom: the welcome page opens by itself
-            welcome = None
+            opened = []
             deadline = time.time() + 30
-            while time.time() < deadline and not welcome:
-                welcome = next((pg for pg in browser.context.pages if pg.url.endswith("/welcome.html")), None)
-                time.sleep(0.2)
-            assert welcome, f"the welcome page didn't open; pages: {[pg.url for pg in browser.context.pages]}; "                             f"stored: {browser.stored()}"
+            while time.time() < deadline and not opened:
+                opened = browser.open_tabs("welcome.html")
+                time.sleep(0.5)
+            assert opened, f"the welcome page didn't open; stored: {browser.stored()}"
+            welcome = browser.context.new_page()           # a copy Playwright can drive
+            welcome.set_viewport_size({"width": 900, "height": 900})
+            welcome.goto(f"chrome-extension://{native.CHROMIUM_ID}/welcome.html")
             playwright.expect(welcome.locator("#status")).to_contain_text("isn't set up", timeout=15000)
             screenshot(welcome, "welcome")
 

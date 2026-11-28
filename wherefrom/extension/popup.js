@@ -31,8 +31,11 @@
         });
         meta.appendChild(skip);
       }
+      var name = el("button", { type: "button", class: "name", text: r.name || "(no name)",
+        title: "Show " + (r.name || "this file") + " in its folder" });
+      name.addEventListener("click", function () { UI.ask({ cmd: "show", downloadId: r.downloadId }); });
       var item = el("li", {}, [
-        el("span", { class: "name", text: r.name || "(no name)", title: r.name || "" }),
+        name,
         el("span", { class: "chip " + r.state, text: LABELS[r.state] || r.state }),
         meta,
       ]);

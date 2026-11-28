@@ -223,6 +223,14 @@ async function command(message) {
       });
       return { ok: true, site };
     }
+    case "show":
+      // The file in its folder (the browser's own "Show in folder")
+      try {
+        await api.downloads.show(Number(message.downloadId));
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error: "The browser no longer knows this download." };
+      }
     case "clear-recent":
       await locked(() => api.storage.local.set({ recent: [] }));
       return { ok: true };
