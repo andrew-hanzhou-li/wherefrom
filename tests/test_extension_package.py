@@ -116,3 +116,12 @@ def test_permissions_are_the_justified_few():
         manifest = json.loads((folder / f"manifest_{kind}.json").read_text())
         assert manifest["permissions"] == ["downloads", "nativeMessaging", "storage", "alarms"]
         assert "host_permissions" not in manifest and "content_scripts" not in manifest
+
+
+def test_a_pip_install_carries_every_extension_file():
+    """pipx/pip installs get only what package-data names; a file left out
+    breaks `wherefrom setup` on macOS and Linux."""
+    import fnmatch
+    patterns = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["wherefrom"]
+    for name in (*native.EXTENSION_FILES, "manifest_chromium.json", "manifest_firefox.json"):
+        assert any(fnmatch.fnmatch(f"extension/{name}", p) for p in patterns), name

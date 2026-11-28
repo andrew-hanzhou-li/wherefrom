@@ -216,11 +216,14 @@ def test_downloads_wait_until_wherefrom_is_there(tmp_path):
             playwright.expect(welcome.locator("#status")).to_contain_text("isn't set up", timeout=15000)
             screenshot(welcome, "welcome")
 
+            # Two downloads while wherefrom is missing: both wait, neither replaces the other
+            browser.download(f"http://127.0.0.1:{port}/page")
             browser.download(f"http://127.0.0.1:{port}/page")
             popup = browser.popup()
             playwright.expect(popup.locator("#status")).to_contain_text("isn't set up", timeout=15000)
-            playwright.expect(popup.locator("#recent li .chip").first).to_have_text("Waiting")
-            playwright.expect(popup.locator("#dropped")).to_contain_text("1 download is waiting")
+            playwright.expect(popup.locator("#recent li")).to_have_count(2)
+            playwright.expect(popup.locator("#recent li .chip")).to_have_text(["Waiting", "Waiting"])
+            playwright.expect(popup.locator("#dropped")).to_contain_text("2 downloads are waiting")
             screenshot(popup, "popup-not-set-up")
             assert browser.ledger.all_records() == []
 
@@ -228,8 +231,8 @@ def test_downloads_wait_until_wherefrom_is_there(tmp_path):
             browser.connect()
             popup.get_by_role("button", name="Check again").click()
             playwright.expect(popup.locator("#status")).to_contain_text("Recording downloads", timeout=15000)
-            playwright.expect(popup.locator("#recent li .chip").first).to_have_text("Recorded")
-            assert len(browser.records()) == 1
+            playwright.expect(popup.locator("#recent li .chip")).to_have_text(["Recorded", "Recorded"])
+            assert len(browser.records(count=2)) == 2
             # and the welcome page notices on its own
             playwright.expect(welcome.locator("h1")).to_have_text("You're all set", timeout=15000)
         finally:

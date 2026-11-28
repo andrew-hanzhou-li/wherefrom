@@ -124,9 +124,10 @@ var WherefromLogic = (function () {
   }
 
   /** Add a download to the waiting list (replacing an older entry for the
-   * same download). Returns {queue, dropped}: the oldest go when it's full. */
+   * same download, matched by `key`). Returns {queue, dropped}: the oldest
+   * go when it's full. */
   function enqueue(queue, entry) {
-    var next = queue.filter(function (q) { return q.id !== entry.id; });
+    var next = queue.filter(function (q) { return q.key !== entry.key; });
     next.push(entry);
     var dropped = Math.max(0, next.length - QUEUE_LIMIT);
     return { queue: next.slice(dropped), dropped: dropped };
@@ -138,10 +139,10 @@ var WherefromLogic = (function () {
     return { queue: keep, dropped: queue.length - keep.length };
   }
 
-  /** Put or update a Recent entry (newest first, limited). */
+  /** Put or update a Recent entry, matched by `key` (newest first, limited). */
   function upsertRecent(recent, entry) {
-    var others = recent.filter(function (r) { return r.id !== entry.id; });
-    var old = recent.filter(function (r) { return r.id === entry.id; })[0];
+    var others = recent.filter(function (r) { return r.key !== entry.key; });
+    var old = recent.filter(function (r) { return r.key === entry.key; })[0];
     var merged = Object.assign({}, old || {}, entry);
     return [merged].concat(others).sort(function (a, b) { return b.time - a.time; }).slice(0, RECENT_LIMIT);
   }

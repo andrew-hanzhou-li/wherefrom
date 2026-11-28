@@ -103,14 +103,14 @@ test("retries back off and then hold at two hours", () => {
 
 test("the waiting list replaces duplicates and drops the oldest when full", () => {
   let q = [];
-  for (let i = 0; i < L.QUEUE_LIMIT; i++) q = L.enqueue(q, { id: i, added: i }).queue;
-  let r = L.enqueue(q, { id: 5, added: 999 });                  // same download again: no growth
+  for (let i = 0; i < L.QUEUE_LIMIT; i++) q = L.enqueue(q, { key: "k" + i, added: i }).queue;
+  let r = L.enqueue(q, { key: "k5", added: 999 });              // same download again: no growth
   assert.equal(r.queue.length, L.QUEUE_LIMIT);
   assert.equal(r.dropped, 0);
-  r = L.enqueue(r.queue, { id: "new", added: 1000 });
+  r = L.enqueue(r.queue, { key: "new", added: 1000 });
   assert.equal(r.dropped, 1);
-  assert.equal(r.queue[0].id, 1);                               // id 0 was the oldest
-  assert.equal(r.queue[r.queue.length - 1].id, "new");
+  assert.equal(r.queue[0].key, "k1");                           // k0 was the oldest
+  assert.equal(r.queue[r.queue.length - 1].key, "new");
 });
 
 test("entries older than the limit expire", () => {
@@ -122,11 +122,11 @@ test("entries older than the limit expire", () => {
 
 test("Recent keeps the newest and updates an entry in place", () => {
   let recent = [];
-  for (let i = 1; i <= 10; i++) recent = L.upsertRecent(recent, { id: i, time: i, state: "waiting" });
+  for (let i = 1; i <= 10; i++) recent = L.upsertRecent(recent, { key: "k" + i, time: i, state: "waiting" });
   assert.equal(recent.length, L.RECENT_LIMIT);
-  assert.equal(recent[0].id, 10);
-  recent = L.upsertRecent(recent, { id: 9, state: "recorded" });
-  const nine = recent.find((r) => r.id === 9);
+  assert.equal(recent[0].key, "k10");
+  recent = L.upsertRecent(recent, { key: "k9", state: "recorded" });
+  const nine = recent.find((r) => r.key === "k9");
   assert.equal(nine.state, "recorded");
   assert.equal(nine.time, 9);                                   // the rest of the entry is kept
 });
@@ -138,4 +138,16 @@ test("ago reads naturally", () => {
   assert.equal(L.ago(0, 3 * 60 * m), "3 h ago");
   assert.equal(L.ago(0, 24 * 60 * m), "1 day ago");
   assert.equal(L.ago(0, 3 * 24 * 60 * m), "3 days ago");
+});
+
+test("downloads shaped as the background script stores them pile up instead of replacing each other", () => {
+  // background.js stores {key, downloadId, ...}: nothing else identifies an entry
+  let queue = [], recent = [];
+  for (const id of [1, 2, 3]) {
+    const key = id + "|2026-11-28T10:00:0" + id;
+    queue = L.enqueue(queue, { key, downloadId: id, added: id, attempts: 0, message: {} }).queue;
+    recent = L.upsertRecent(recent, { key, downloadId: id, name: "f" + id, time: id, state: "waiting" });
+  }
+  assert.deepEqual(queue.map((q) => q.downloadId), [1, 2, 3]);
+  assert.deepEqual(recent.map((r) => r.downloadId), [3, 2, 1]);
 });
