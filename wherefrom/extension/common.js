@@ -52,8 +52,10 @@ var WherefromUI = (function () {
     }
   }
 
-  /** Fill `box` (a .status element) for this status; `onCheck` runs "Check again". */
-  function renderStatus(box, status, settings, onCheck, install) {
+  /** Fill `box` (a .status element) for this status; `onCheck` runs "Check again".
+   * `compact` leaves out the install explanation and link, for the welcome
+   * page, whose steps already give them. */
+  function renderStatus(box, status, settings, onCheck, install, compact) {
     var state = (status && status.state) || "unknown";
     var title, lines = [], actions = [], kind = "";
     var check = el("button", { type: "button", class: "btn secondary", text: "Check again" });
@@ -69,9 +71,13 @@ var WherefromUI = (function () {
       lines.push(el("p", { class: "muted", text: status.version ? "Connected to wherefrom " + status.version + "." : "Connected to wherefrom." }));
     } else if (state === "missing") {
       title = "wherefrom isn't set up on this computer"; kind = "problem";
-      lines.push(el("p", { text: "This extension sends each download to the wherefrom program, which keeps the record. Downloads wait here until it's installed." }));
-      var get = el("a", { class: "btn primary", href: install.href, target: "_blank", rel: "noopener", text: install.label });
-      actions.push(get, check);
+      if (compact) {
+        actions.push(check);
+      } else {
+        lines.push(el("p", { text: "This extension sends each download to the wherefrom program, which keeps the record. Downloads wait here until it's installed." }));
+        var get = el("a", { class: "btn primary", href: install.href, target: "_blank", rel: "noopener", text: install.label });
+        actions.push(get, check);
+      }
     } else if (state === "forbidden") {
       title = "wherefrom doesn't recognise this copy of the extension yet"; kind = "problem";
       var cmd = "wherefrom browser setup --extension-id " + api.runtime.id;

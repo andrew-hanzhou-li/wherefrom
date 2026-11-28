@@ -11,7 +11,7 @@
   function render(data) {
     var status = data.status || { state: "unknown" };
     var settings = Object.assign({ paused: false }, data.settings);
-    UI.renderStatus(document.getElementById("status"), status, settings, check, install);
+    UI.renderStatus(document.getElementById("status"), status, settings, check, install, true);
     var connected = status.state === "connected";
     document.body.classList.toggle("done", connected);
     document.querySelector("h1").textContent = connected ? "You're all set" : "One more step: install wherefrom";

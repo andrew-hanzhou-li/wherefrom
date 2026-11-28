@@ -242,6 +242,7 @@ def test_a_skipped_site_is_not_recorded_but_others_are(tmp_path):
         try:
             popup = browser.popup()
             playwright.expect(popup.locator("#status")).to_contain_text("Recording downloads", timeout=15000)
+            playwright.expect(popup.locator("#clear-recent")).to_be_hidden()   # nothing to clear yet
             popup.locator("#sites summary").click()
             popup.locator("#site").fill("http://localhost/whatever")
             popup.locator("#add-site button").click()
