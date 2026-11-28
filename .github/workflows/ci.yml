@@ -189,6 +189,8 @@ jobs:
             $version = & "$app\wherefrom.exe" --version
             if ($version -ne "wherefrom $expected") { throw "expected wherefrom $expected, got $version" }
             if (-not (Test-Path "$app\_internal")) { throw "the folder build's _internal is missing" }
+            # wherefrom's own check agrees that everything is set up (the watcher may take a moment)
+            Wait-Until "wherefrom doctor to find nothing to fix" { & "$app\wherefrom.exe" doctor | Out-Host; $LASTEXITCODE -eq 0 } 30
             # The installed program reads a real Mark of the Web
             $file = "$env:RUNNER_TEMP\installed-check.pdf"
             Set-Content -Path $file -Value "installed check $(Get-Random)"

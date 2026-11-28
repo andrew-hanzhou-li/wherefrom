@@ -30,3 +30,23 @@ def hold(path):
     handle.write(str(os.getpid()).encode())     # for people looking; nothing reads it
     handle.flush()
     return handle
+
+
+def watch_lock(data_folder, folders):
+    """The lock file a watcher for these folders holds (one per set of folders:
+    a second watcher for the same folders would only do the same work twice)."""
+    import hashlib
+    from pathlib import Path
+    key = hashlib.sha256("\n".join(sorted(str(Path(f).resolve()) for f in folders)).encode()).hexdigest()[:12]
+    return Path(data_folder) / "locks" / f"watch-{key}.lock"
+
+
+def is_held(path):
+    """True if some process holds the lock in `path` right now."""
+    if not path.exists():
+        return False
+    handle = hold(path)
+    if handle is None:
+        return True
+    handle.close()
+    return False

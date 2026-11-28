@@ -86,7 +86,7 @@ var WherefromUI = (function () {
       actions.push(check);
     } else if (state === "error") {
       title = "wherefrom didn't answer"; kind = "problem";
-      lines.push(el("p", { text: "Try again in a moment. If it keeps happening, reinstalling wherefrom usually fixes it." }));
+      lines.push(el("p", { text: "Try again in a moment. If it keeps happening, run \"wherefrom doctor\" in a terminal: it says what to fix." }));
       if (status.detail) lines.push(el("p", { class: "muted small", text: "Details: " + status.detail }));
       actions.push(check);
     } else {

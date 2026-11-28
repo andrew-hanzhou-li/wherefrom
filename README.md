@@ -90,6 +90,7 @@ You don't need any of these for everyday use: the menu entry and the window cove
 | Command | What it does |
 |---|---|
 | `wherefrom setup` | Set everything up in one go (`--no-import`, `--no-start` to skip those steps) |
+| `wherefrom doctor` | Check the setup and say how to fix anything that isn't right |
 | `wherefrom show FILE` | Where a file came from (`--gui` for the small window the menu opens) |
 | `wherefrom app` | A window to browse and search everything recorded |
 | `wherefrom search TEXT` | Files from a site or URL, or with a name, e.g. `wherefrom search canvas` |

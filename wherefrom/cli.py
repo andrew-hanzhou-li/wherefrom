@@ -70,13 +70,9 @@ def cmd_search(args, ledger):
 
 
 def cmd_watch(args, ledger):
-    import hashlib
     from . import lock
     folders = args.folder or [downloads_folder()]
-    # One watcher per set of folders: a second one for the same folders would
-    # only do the same work twice
-    key = hashlib.sha256("\n".join(sorted(str(Path(f).resolve()) for f in folders)).encode()).hexdigest()[:12]
-    held = lock.hold(Path(ledger.path).parent / "locks" / f"watch-{key}.lock")
+    held = lock.hold(lock.watch_lock(Path(ledger.path).parent, folders))
     if held is None:
         print("A wherefrom watcher for " + ", ".join(str(f) for f in folders) + " is already running.")
         return 0
@@ -175,6 +171,11 @@ def cmd_import(args, ledger):
     return 0
 
 
+def cmd_doctor(args, ledger):
+    from . import doctor
+    return doctor.run()
+
+
 def cmd_setup(args, ledger):
     from . import quickstart
     return quickstart.run(ledger, do_import=not args.no_import, do_start=not args.no_start)
@@ -224,6 +225,9 @@ def build_parser():
     setup.add_argument("--no-import", action="store_true", help="skip reading the browsers' download history")
     setup.add_argument("--no-start", action="store_true", help="don't start the watcher now")
     setup.set_defaults(run=cmd_setup)
+
+    doctor = sub.add_parser("doctor", help="check the setup and say how to fix anything that isn't right")
+    doctor.set_defaults(run=cmd_doctor)
 
     show = sub.add_parser("show", help="where a file came from")
     show.add_argument("file")
