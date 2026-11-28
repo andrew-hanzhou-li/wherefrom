@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -70,13 +71,15 @@ def cmd_search(args, ledger):
 
 
 def cmd_watch(args, ledger):
-    import hashlib
     from . import lock
     folders = args.folder or [downloads_folder()]
-    # One watcher per set of folders: a second one for the same folders would
-    # only do the same work twice
-    key = hashlib.sha256("\n".join(sorted(str(Path(f).resolve()) for f in folders)).encode()).hexdigest()[:12]
-    held = lock.hold(Path(ledger.path).parent / "locks" / f"watch-{key}.lock")
+    path = lock.watch_lock(Path(ledger.path).parent, folders)
+    held = lock.hold(path)
+    for _ in range(8):           # something only checking (wherefrom doctor) lets go within moments
+        if held is not None:
+            break
+        time.sleep(0.25)
+        held = lock.hold(path)
     if held is None:
         print("A wherefrom watcher for " + ", ".join(str(f) for f in folders) + " is already running.")
         return 0
@@ -118,7 +121,7 @@ def cmd_browser(args, ledger):
     if not summary["registered"]:
         print("No supported browser was found for this user; install one and run this again.")
     print()
-    print("Chrome, Edge, Brave, Vivaldi: open the extensions page (e.g. chrome://extensions),")
+    print("Chrome, Edge, Brave, Opera, Vivaldi: open the extensions page (e.g. chrome://extensions),")
     print("turn on Developer mode, choose \"Load unpacked\" and pick:")
     print(f"  {folders['chromium']}")
     print("Firefox: open about:debugging > This Firefox > Load Temporary Add-on and pick")
@@ -164,7 +167,7 @@ def cmd_import(args, ledger):
         print(f"Reading {browser} ({history.parent.name})...", flush=True)
     results = browsers.import_all(ledger, on_start=reading)
     if not results:
-        print("No browser history found (Chrome, Edge, Brave, Vivaldi or Firefox).")
+        print("No browser history found (Chrome, Edge, Brave, Opera, Vivaldi, Firefox and others).")
         return 1
     for browser, history, total, new in results:
         if total is None:
@@ -173,6 +176,11 @@ def cmd_import(args, ledger):
             print(f"{browser}: {total} downloads in history, {new} new file(s) recorded"
                   f" ({history.parent.name})")
     return 0
+
+
+def cmd_doctor(args, ledger):
+    from . import doctor
+    return doctor.run()
 
 
 def cmd_setup(args, ledger):
@@ -224,6 +232,9 @@ def build_parser():
     setup.add_argument("--no-import", action="store_true", help="skip reading the browsers' download history")
     setup.add_argument("--no-start", action="store_true", help="don't start the watcher now")
     setup.set_defaults(run=cmd_setup)
+
+    doctor = sub.add_parser("doctor", help="check the setup and say how to fix anything that isn't right")
+    doctor.set_defaults(run=cmd_doctor, no_ledger=True)
 
     show = sub.add_parser("show", help="where a file came from")
     show.add_argument("file")
@@ -294,6 +305,8 @@ def main(argv=None):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     args = build_parser().parse_args(argv)
+    if getattr(args, "no_ledger", False):       # doctor only looks; opening the ledger would create it
+        return args.run(args, None)
     ledger = Ledger()
     try:
         return args.run(args, ledger)

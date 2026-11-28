@@ -71,3 +71,57 @@ def test_store_ids_are_allowed_by_the_host(monkeypatch):
     origins = native.host_manifest("chromium", "/x/h")["allowed_origins"]
     assert "chrome-extension://storeidstoreidstoreidstoreidstor/" in origins
     assert f"chrome-extension://{native.CHROMIUM_ID}/" in origins
+
+
+def page_references(html):
+    """Relative files an extension page loads (scripts, styles, images)."""
+    import re
+    refs = re.findall(r'<(?:script|img)[^>]*\ssrc="([^"]+)"', html) + re.findall(r'<link[^>]*\shref="([^"]+)"', html)
+    return [r for r in refs if "://" not in r]
+
+
+def test_every_extension_file_is_shipped_and_every_reference_exists():
+    folder = resources.files("wherefrom") / "extension"
+    on_disk = {p.name for p in Path(str(folder)).iterdir() if p.is_file() and not p.name.startswith("manifest_")}
+    on_disk |= {f"icons/{p.name}" for p in (Path(str(folder)) / "icons").iterdir()}
+    assert on_disk == set(native.EXTENSION_FILES), "native.EXTENSION_FILES must list every extension file"
+    for kind in ("chromium", "firefox"):
+        manifest = json.loads((folder / f"manifest_{kind}.json").read_text())
+        pages = [manifest["action"]["default_popup"], "welcome.html"]
+        for page in pages:
+            assert page in native.EXTENSION_FILES
+            html = (folder / page).read_text(encoding="utf-8")
+            for ref in page_references(html):
+                assert ref in native.EXTENSION_FILES, (page, ref)
+
+
+def test_extension_pages_have_no_inline_scripts_or_remote_resources():
+    import re
+    folder = resources.files("wherefrom") / "extension"
+    for name in native.EXTENSION_FILES:
+        if not name.endswith(".html"):
+            continue
+        html = (folder / name).read_text(encoding="utf-8")
+        # MV3 refuses inline scripts and handlers; every <script> must load a file
+        assert not re.search(r"<script(?![^>]*\ssrc=)[^>]*>", html), name
+        assert not re.search(r"\son[a-z]+=", html), name
+        for ref in re.findall(r'<(?:script|img)[^>]*\ssrc="([^"]+)"|<link[^>]*\shref="([^"]+)"', html):
+            ref = ref[0] or ref[1]
+            assert "://" not in ref, (name, ref)            # nothing loaded from the web
+
+
+def test_permissions_are_the_justified_few():
+    folder = resources.files("wherefrom") / "extension"
+    for kind in ("chromium", "firefox"):
+        manifest = json.loads((folder / f"manifest_{kind}.json").read_text())
+        assert manifest["permissions"] == ["downloads", "nativeMessaging", "storage", "alarms"]
+        assert "host_permissions" not in manifest and "content_scripts" not in manifest
+
+
+def test_a_pip_install_carries_every_extension_file():
+    """pipx/pip installs get only what package-data names; a file left out
+    breaks `wherefrom setup` on macOS and Linux."""
+    import fnmatch
+    patterns = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["setuptools"]["package-data"]["wherefrom"]
+    for name in (*native.EXTENSION_FILES, "manifest_chromium.json", "manifest_firefox.json"):
+        assert any(fnmatch.fnmatch(f"extension/{name}", p) for p in patterns), name

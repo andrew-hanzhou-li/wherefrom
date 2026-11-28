@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>wherefrom</title>
+<link rel="stylesheet" href="ui.css">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+<main>
+  <header>
+    <img class="mark" src="icons/icon-32.png" alt="">
+    <h1>wherefrom</h1>
+    <label class="switch" for="record">
+      <span id="record-label">Record downloads</span>
+      <input type="checkbox" id="record" role="switch">
+    </label>
+  </header>
+
+  <section id="status" class="status" aria-live="polite">
+    <p class="title"><span class="dot"></span><span id="status-title">Checking…</span></p>
+  </section>
+
+  <section class="block">
+    <div class="block-head">
+      <h2>Recent downloads</h2>
+      <button type="button" class="btn quiet" id="clear-recent" hidden>Clear</button>
+    </div>
+    <ul id="recent" class="list"></ul>
+    <p id="recent-empty" class="muted empty">Downloads you make from now on appear here.</p>
+    <p id="dropped" class="muted small" hidden></p>
+  </section>
+
+  <section class="block">
+    <details id="sites">
+      <summary><h2>Sites not recorded <span id="sites-count" class="muted"></span></h2></summary>
+      <p class="muted small">Downloads from these sites, or from pages on them, aren't sent to wherefrom.</p>
+      <ul id="excluded" class="list compact"></ul>
+      <form id="add-site" class="add">
+        <label for="site" class="visually-hidden">Site to stop recording</label>
+        <input id="site" type="text" placeholder="example.com" autocomplete="off" spellcheck="false">
+        <button type="submit" class="btn secondary">Add</button>
+      </form>
+      <p id="site-error" class="error small" hidden></p>
+    </details>
+  </section>
+
+  <footer>
+    <a href="https://github.com/andrew-hanzhou-li/wherefrom#readme" target="_blank" rel="noopener">How it works</a>
+    <a href="https://github.com/andrew-hanzhou-li/wherefrom/blob/main/PRIVACY.md" target="_blank" rel="noopener">Privacy</a>
+    <a href="https://github.com/andrew-hanzhou-li/wherefrom/issues/new/choose" target="_blank" rel="noopener">Report a problem</a>
+  </footer>
+</main>
+<script src="logic.js"></script>
+<script src="common.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

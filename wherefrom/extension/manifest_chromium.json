@@ -1,17 +1,27 @@
 {
   "manifest_version": 3,
   "name": "wherefrom",
-  "version": "0.3.0",
-  "description": "Tells the wherefrom program where each download came from, so you can look it up later.",
+  "version": "0.4.0",
+  "description": "Tells the wherefrom program on your computer where each download came from, so you can look it up later. Requires wherefrom.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
   },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "wherefrom",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
   "permissions": [
     "downloads",
-    "nativeMessaging"
+    "nativeMessaging",
+    "storage",
+    "alarms"
   ],
   "background": {
     "service_worker": "background.js"

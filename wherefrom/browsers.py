@@ -26,6 +26,19 @@ CHROMIUM_BROWSERS = {
     "edge": Path("Microsoft", "Edge", "User Data"),
     "brave": Path("BraveSoftware", "Brave-Browser", "User Data"),
     "vivaldi": Path("Vivaldi", "User Data"),
+    "chromium": Path("Chromium", "User Data"),
+}
+# Opera keeps its profile under %APPDATA% (Roaming), not in a "User Data" folder
+OPERA_WINDOWS = {
+    "opera": Path("Opera Software", "Opera Stable"),
+    "opera-gx": Path("Opera Software", "Opera GX Stable"),
+}
+# Browsers built on Firefox keep Firefox's places.sqlite in their own profiles
+FIREFOX_FORKS_WINDOWS = {        # under %APPDATA%
+    "librewolf": Path("librewolf", "Profiles"),
+    "waterfox": Path("Waterfox", "Profiles"),
+    "floorp": Path("Floorp", "Profiles"),
+    "zen": Path("zen", "Profiles"),
 }
 CHROMIUM_MAC = {
     "chrome": Path("Google", "Chrome"),
@@ -33,6 +46,14 @@ CHROMIUM_MAC = {
     "brave": Path("BraveSoftware", "Brave-Browser"),
     "vivaldi": Path("Vivaldi"),
     "chromium": Path("Chromium"),
+    "opera": Path("com.operasoftware.Opera"),
+    "opera-gx": Path("com.operasoftware.OperaGX"),
+}
+FIREFOX_FORKS_MAC = {            # under ~/Library/Application Support
+    "librewolf": Path("librewolf", "Profiles"),
+    "waterfox": Path("Waterfox", "Profiles"),
+    "floorp": Path("Floorp", "Profiles"),
+    "zen": Path("zen", "Profiles"),
 }
 CHROMIUM_LINUX = {
     "chrome": [".config/google-chrome", ".var/app/com.google.Chrome/config/google-chrome"],
@@ -42,6 +63,13 @@ CHROMIUM_LINUX = {
     "vivaldi": [".config/vivaldi"],
     "chromium": [".config/chromium", "snap/chromium/common/chromium",
                  ".var/app/org.chromium.Chromium/config/chromium"],
+    "opera": [".config/opera"],
+}
+FIREFOX_FORKS_LINUX = {
+    "librewolf": [".librewolf", ".var/app/io.gitlab.librewolf-community/.librewolf"],
+    "waterfox": [".waterfox"],
+    "floorp": [".floorp", ".var/app/one.ablaze.floorp/.floorp"],
+    "zen": [".zen", ".var/app/app.zen_browser.zen/.zen"],
 }
 FIREFOX_LINUX = [".mozilla/firefox", "snap/firefox/common/.mozilla/firefox",
                  ".var/app/org.mozilla.firefox/.mozilla/firefox"]
@@ -49,33 +77,46 @@ FIREFOX_LINUX = [".mozilla/firefox", "snap/firefox/common/.mozilla/firefox",
 CHROMIUM_COMPLETE = 1       # downloads.state for a finished download
 
 
-def profiles_in(browser, root, file_name):
-    """(browser, file) for each profile folder under `root` that has `file_name`."""
+def profiles_in(browser, root, file_name, also_root=False):
+    """(browser, file) for each profile folder under `root` that has `file_name`
+    (and `root` itself with `also_root`: Opera's main profile is the folder
+    itself)."""
     root = Path(root)
     if not root.is_dir():
         return []
-    return [(browser, profile / file_name) for profile in sorted(root.iterdir())
-            if (profile / file_name).is_file()]
+    found = [(browser, root / file_name)] if also_root and (root / file_name).is_file() else []
+    return found + [(browser, profile / file_name) for profile in sorted(root.iterdir())
+                    if profile.is_dir() and (profile / file_name).is_file()]
 
 
-def chromium_histories(local_appdata):
+def chromium_histories(local_appdata, appdata=None):
     """Windows: (browser, History file) for every profile of every Chromium browser."""
     found = []
     for browser, user_data in CHROMIUM_BROWSERS.items():
         found += profiles_in(browser, Path(local_appdata) / user_data, "History")
+    if appdata:
+        for browser, folder in OPERA_WINDOWS.items():
+            found += profiles_in(browser, Path(appdata) / folder, "History", also_root=True)
     return found
 
 
 def firefox_histories(appdata):
-    return profiles_in("firefox", Path(appdata) / "Mozilla" / "Firefox" / "Profiles", "places.sqlite")
+    """Windows: Firefox's profiles, and those of browsers built on it."""
+    found = profiles_in("firefox", Path(appdata) / "Mozilla" / "Firefox" / "Profiles", "places.sqlite")
+    for browser, folder in FIREFOX_FORKS_WINDOWS.items():
+        found += profiles_in(browser, Path(appdata) / folder, "places.sqlite")
+    return found
 
 
 def mac_histories(home):
     support = Path(home) / "Library" / "Application Support"
     found = []
     for browser, folder in CHROMIUM_MAC.items():
-        found += profiles_in(browser, support / folder, "History")
-    return found + profiles_in("firefox", support / "Firefox" / "Profiles", "places.sqlite")
+        found += profiles_in(browser, support / folder, "History", also_root=browser.startswith("opera"))
+    found += profiles_in("firefox", support / "Firefox" / "Profiles", "places.sqlite")
+    for browser, folder in FIREFOX_FORKS_MAC.items():
+        found += profiles_in(browser, support / folder, "places.sqlite")
+    return found
 
 
 def linux_path(home, folder, config_home=None):
@@ -91,9 +132,13 @@ def linux_histories(home, config_home=None):
     found = []
     for browser, folders in CHROMIUM_LINUX.items():
         for folder in folders:
-            found += profiles_in(browser, linux_path(home, folder, config_home), "History")
+            found += profiles_in(browser, linux_path(home, folder, config_home), "History",
+                                 also_root=browser.startswith("opera"))
     for folder in FIREFOX_LINUX:
         found += profiles_in("firefox", Path(home) / folder, "places.sqlite")
+    for browser, folders in FIREFOX_FORKS_LINUX.items():
+        for folder in folders:
+            found += profiles_in(browser, Path(home) / folder, "places.sqlite")
     return found
 
 
@@ -103,7 +148,7 @@ def all_histories(platform=None, home=None, local_appdata=None, appdata=None):
     if platform == "win32":
         local_appdata = local_appdata or os.environ.get("LOCALAPPDATA", "")
         appdata = appdata or os.environ.get("APPDATA", "")
-        return (chromium_histories(local_appdata) if local_appdata else []) + \
+        return (chromium_histories(local_appdata, appdata) if local_appdata else []) + \
             (firefox_histories(appdata) if appdata else [])
     home = home or Path.home()
     return mac_histories(home) if platform == "darwin" else linux_histories(home)
@@ -195,7 +240,8 @@ def import_history(ledger, browser, history_file):
         copy = copy_database(Path(history_file), folder)
         db = sqlite3.connect(str(copy))
         try:
-            if browser == "firefox":
+            # Firefox and the browsers built on it keep places.sqlite; the rest are Chromium
+            if Path(history_file).name == "places.sqlite":
                 downloads = firefox_downloads(db)
             else:
                 downloads = chromium_downloads(db)

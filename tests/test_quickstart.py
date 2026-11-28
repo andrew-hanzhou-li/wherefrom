@@ -38,7 +38,7 @@ def test_skips_history_and_watcher_when_asked(ledger, capsys):
 def test_no_browser_history_is_not_a_failure(ledger, monkeypatch):
     monkeypatch.setattr(quickstart.browsers, "import_all", lambda ledger: [])
     history = dict(quickstart.default_steps(ledger))["history"]
-    assert "no Chrome" in history()
+    assert "no browser history found" in history()
 
 
 def test_watcher_command_prefers_the_windowless_program(tmp_path, monkeypatch):

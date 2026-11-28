@@ -52,6 +52,12 @@ def test_a_download_is_recorded(tmp_path, ledger):
     assert record.downloaded_at == local.isoformat(timespec="seconds")
 
 
+def test_ping_says_wherefrom_is_there(ledger):
+    from wherefrom import __version__
+    assert native.handle({"type": "ping"}, ledger) == {"ok": True, "version": __version__}
+    assert ledger.all_records() == []                       # and records nothing
+
+
 def test_bad_messages_are_refused(tmp_path, ledger):
     f = tmp_path / "f.zip"
     f.write_bytes(b"zip")
@@ -209,3 +215,14 @@ def test_firefox_on_mac_is_found_by_its_profile_folder(tmp_path):
     summary = native.setup("darwin", home, tmp_path / "data", cmd=["/usr/bin/python3"], env={})
     expected = home / "Library" / "Application Support" / "Mozilla" / "NativeMessagingHosts" / f"{native.HOST_NAME}.json"
     assert summary["registered"] == [str(expected)] and expected.is_file()
+
+
+def test_linux_browsers_built_on_firefox_get_the_host_too(tmp_path):
+    home, data = tmp_path / "home", tmp_path / "data"
+    (home / ".librewolf").mkdir(parents=True)                         # LibreWolf is installed, nothing else
+    summary = native.setup("linux", home, data, cmd=["/usr/bin/python3", "-P", "-m", "wherefrom", "native-host"])
+    target = home / ".librewolf" / "native-messaging-hosts" / f"{native.HOST_NAME}.json"
+    assert summary["registered"] == [str(target)]
+    assert json.loads(target.read_text())["allowed_extensions"] == [native.FIREFOX_ID]
+    assert not (home / ".zen").exists() and not (home / ".mozilla").exists()   # not installed: left alone
+    assert str(target) in native.remove("linux", home, data) and not target.exists()

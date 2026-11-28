@@ -37,7 +37,9 @@ MAX_MESSAGE = 1024 * 1024
 MAX_TEXT = 8192
 # The extension's files besides its manifest, which differs per browser family
 EXTENSION_ICONS = tuple(f"icons/icon-{size}.png" for size in (16, 32, 48, 128))
-EXTENSION_FILES = ("background.js", *EXTENSION_ICONS)
+EXTENSION_FILES = ("background.js", "logic.js", "common.js", "ui.css",
+                   "popup.html", "popup.css", "popup.js",
+                   "welcome.html", "welcome.css", "welcome.js", *EXTENSION_ICONS)
 
 # Where Chromium browsers look for host manifests, per system
 WINDOWS_KEYS = {
@@ -47,12 +49,13 @@ WINDOWS_KEYS = {
     "firefox": [r"Software\Mozilla\NativeMessagingHosts"],
 }
 MAC_DIRS = {
-    "chromium": ["Google/Chrome", "Microsoft Edge", "BraveSoftware/Brave-Browser", "Chromium", "Vivaldi"],
+    "chromium": ["Google/Chrome", "Microsoft Edge", "BraveSoftware/Brave-Browser", "Chromium", "Vivaldi",
+                 "com.operasoftware.Opera"],
     "firefox": ["Mozilla"],
 }
 LINUX_DIRS = {
     "chromium": [".config/google-chrome", ".config/microsoft-edge", ".config/BraveSoftware/Brave-Browser",
-                 ".config/chromium", ".config/vivaldi"],
+                 ".config/chromium", ".config/vivaldi", ".config/opera"],
     "firefox": [".mozilla"],
 }
 
@@ -102,7 +105,11 @@ def browser_time(value):
 
 
 def handle(message, ledger):
-    """Record one finished download. Returns the reply for the extension."""
+    """Answer one message: "ping" (is wherefrom there, which version) or
+    "download" (record one finished download). Returns the reply."""
+    if isinstance(message, dict) and message.get("type") == "ping":
+        from . import __version__
+        return {"ok": True, "version": __version__}
     if not isinstance(message, dict) or message.get("type") != "download":
         return {"ok": False, "error": "unknown message"}
     path = text(message.get("path"))
@@ -218,7 +225,10 @@ def manifest_dirs(platform, home):
         support = Path(home) / "Library" / "Application Support"
         return {kind: [support / d / "NativeMessagingHosts" for d in dirs] for kind, dirs in MAC_DIRS.items()}
     linux = {kind: [linux_path(home, d) / "NativeMessagingHosts" for d in dirs] for kind, dirs in LINUX_DIRS.items()}
-    linux["firefox"] = [Path(home) / ".mozilla" / "native-messaging-hosts"]
+    # Firefox, and browsers built on it that look in their own folder (only
+    # used where that browser's folder exists, like every entry here)
+    linux["firefox"] = [Path(home) / folder / "native-messaging-hosts"
+                        for folder in (".mozilla", ".librewolf", ".waterfox", ".floorp", ".zen")]
     return linux
 
 

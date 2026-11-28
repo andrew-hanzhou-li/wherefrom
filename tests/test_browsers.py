@@ -170,3 +170,54 @@ def test_import_all_on_linux(tmp_path, ledger):
     make_chromium_history(profile / "History", [(str(f), ["https://dl.test/x.bin"], "", "", 1, 0)])
     results = browsers.import_all(ledger, platform="linux", home=tmp_path / "home")
     assert [(r[0], r[2], r[3]) for r in results] == [("chrome", 1, 1)]
+
+
+def test_more_browsers_are_found_on_windows(tmp_path, ledger):
+    local, roaming = tmp_path / "Local", tmp_path / "Roaming"
+    f = tmp_path / "y.bin"
+    f.write_bytes(b"y")
+    # Opera's main profile is the folder itself
+    opera = roaming / "Opera Software" / "Opera Stable"
+    opera.mkdir(parents=True)
+    make_chromium_history(opera / "History", [(str(f), ["https://opera.test/y.bin"], "", "", 1, 0)])
+    chromium = local / "Chromium" / "User Data" / "Default"
+    chromium.mkdir(parents=True)
+    make_chromium_history(chromium / "History", [])
+    for fork in ("librewolf", "Waterfox", "Floorp", "zen"):
+        profile = roaming / fork / "Profiles" / "abc.default"
+        profile.mkdir(parents=True)
+        make_firefox_places(profile / "places.sqlite", [])
+    found = browsers.all_histories("win32", local_appdata=local, appdata=roaming)
+    assert sorted(b for b, _ in found) == ["chromium", "floorp", "librewolf", "opera", "waterfox", "zen"]
+    # A browser built on Firefox is read as Firefox, whatever it's called
+    results = browsers.import_all(ledger, local_appdata=local, appdata=roaming)
+    assert all(r[2] is not None for r in results), results
+    assert ledger.search("opera.test")[0].source == "opera"
+
+
+def test_more_browsers_are_found_on_mac_and_linux(tmp_path):
+    home = tmp_path / "home"
+    mac = home / "Library" / "Application Support"
+    (mac / "com.operasoftware.Opera").mkdir(parents=True)
+    make_chromium_history(mac / "com.operasoftware.Opera" / "History", [])
+    for fork in ("librewolf", "zen"):
+        profile = mac / fork / "Profiles" / "p.default"
+        profile.mkdir(parents=True)
+        make_firefox_places(profile / "places.sqlite", [])
+    assert sorted(b for b, _ in browsers.all_histories("darwin", home)) == ["librewolf", "opera", "zen"]
+
+    linux = tmp_path / "lhome"
+    (linux / ".config" / "opera").mkdir(parents=True)
+    make_chromium_history(linux / ".config" / "opera" / "History", [])
+    for folder in (".librewolf/a.default", ".floorp/b.default", ".var/app/app.zen_browser.zen/.zen/c.default"):
+        (linux / folder).mkdir(parents=True)
+        make_firefox_places(linux / folder / "places.sqlite", [])
+    assert sorted(b for b, _ in browsers.all_histories("linux", linux)) == ["floorp", "librewolf", "opera", "zen"]
+
+
+def test_every_browser_has_a_name_people_can_read():
+    from wherefrom.ledger import SOURCE_NAMES
+    names = set(browsers.CHROMIUM_BROWSERS) | set(browsers.CHROMIUM_MAC) | set(browsers.CHROMIUM_LINUX) | \
+        set(browsers.OPERA_WINDOWS) | set(browsers.FIREFOX_FORKS_WINDOWS) | set(browsers.FIREFOX_FORKS_MAC) | \
+        set(browsers.FIREFOX_FORKS_LINUX) | {"firefox"}
+    assert names <= set(SOURCE_NAMES), names - set(SOURCE_NAMES)

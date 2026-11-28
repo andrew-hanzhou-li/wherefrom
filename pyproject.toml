@@ -4,17 +4,30 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wherefrom"
-version = "0.3.0"
+version = "0.4.0"
 description = "Remember where your downloaded files came from, even after they're copied or renamed."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "andrew-hanzhou-li" }]
+keywords = ["downloads", "provenance", "mark-of-the-web", "file-history", "browser-extension"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
     "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
     "Environment :: Win32 (MS Windows)",
+    "Programming Language :: Python :: 3",
     "Topic :: Desktop Environment :: File Managers",
+    "Topic :: Utilities",
 ]
+
+[project.urls]
+Homepage = "https://github.com/andrew-hanzhou-li/wherefrom"
+Download = "https://github.com/andrew-hanzhou-li/wherefrom/releases/latest"
+Issues = "https://github.com/andrew-hanzhou-li/wherefrom/issues"
+Privacy = "https://github.com/andrew-hanzhou-li/wherefrom/blob/main/PRIVACY.md"
 
 [project.scripts]
 wherefrom = "wherefrom.cli:main"
@@ -26,7 +39,7 @@ wherefromw = "wherefrom.cli:main"
 packages = ["wherefrom"]
 
 [tool.setuptools.package-data]
-wherefrom = ["extension/*.js", "extension/*.json", "extension/icons/*.png"]
+wherefrom = ["extension/*.js", "extension/*.json", "extension/*.html", "extension/*.css", "extension/icons/*.png"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

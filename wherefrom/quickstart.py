@@ -96,7 +96,7 @@ def default_steps(ledger):
     def history():
         results = browsers.import_all(ledger)
         if not results:
-            return "Download history: no Chrome, Edge, Brave, Vivaldi or Firefox history found."
+            return "Download history: no browser history found (Chrome, Edge, Brave, Opera, Vivaldi, Firefox and others)."
         parts = [f"{browser} {new} new" if total is not None else f"{browser} unreadable ({new})"
                  for browser, history_file, total, new in results]
         return "Download history imported: " + ", ".join(parts) + "."
