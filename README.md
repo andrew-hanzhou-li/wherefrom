@@ -70,7 +70,7 @@ You don't need it: wherefrom already reads what the browser records. The extensi
 
 The installer (or `wherefrom setup`) has already connected your browsers. To add the extension itself:
 
-- **Chrome, Edge, Brave, Opera, Vivaldi:** open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick `%LOCALAPPDATA%\wherefrom\browser\extension-chromium` (Windows) or the folder `wherefrom browser setup` prints.
+- **Chrome, Edge, Brave, Opera, Vivaldi** (Opera and Vivaldi less tested): open the extensions page (`chrome://extensions`, `edge://extensions`, ...), turn on **Developer mode**, click **Load unpacked** and pick `%LOCALAPPDATA%\wherefrom\browser\extension-chromium` (Windows) or the folder `wherefrom browser setup` prints.
 - **Firefox (and LibreWolf, Waterfox, Floorp, Zen):** open `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick `manifest.json` in the `extension-firefox` folder next to it. Firefox removes unsigned add-ons when it restarts; to keep it, sign it for free on addons.mozilla.org (as "unlisted") and install the signed file.
 
 Its toolbar button shows whether it's working:

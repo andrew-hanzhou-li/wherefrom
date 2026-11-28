@@ -49,12 +49,13 @@ WINDOWS_KEYS = {
     "firefox": [r"Software\Mozilla\NativeMessagingHosts"],
 }
 MAC_DIRS = {
-    "chromium": ["Google/Chrome", "Microsoft Edge", "BraveSoftware/Brave-Browser", "Chromium", "Vivaldi"],
+    "chromium": ["Google/Chrome", "Microsoft Edge", "BraveSoftware/Brave-Browser", "Chromium", "Vivaldi",
+                 "com.operasoftware.Opera"],
     "firefox": ["Mozilla"],
 }
 LINUX_DIRS = {
     "chromium": [".config/google-chrome", ".config/microsoft-edge", ".config/BraveSoftware/Brave-Browser",
-                 ".config/chromium", ".config/vivaldi"],
+                 ".config/chromium", ".config/vivaldi", ".config/opera"],
     "firefox": [".mozilla"],
 }
 

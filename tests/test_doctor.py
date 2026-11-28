@@ -92,3 +92,42 @@ def test_linux_setup_files_are_checked(tmp_path, monkeypatch):
     assert "The watcher starts at sign-in" in text
     assert "Browser extension connected for Chrome-based browsers" in text
     assert code == 1 and "watcher isn't running" in text           # the only thing left
+
+
+def test_odd_registry_values_dont_crash_it(tmp_path, monkeypatch):
+    assert doctor.program_in(r'"C:\Program Files\w\wherefromw.exe" show --gui -- "%1"') == r"C:\Program Files\w\wherefromw.exe"
+    assert doctor.program_in(r"C:\Program Files\w\wherefromw.exe show --gui") == r"C:\Program Files\w\wherefromw.exe"
+    assert doctor.program_in("/usr/bin/wherefrom watch") == "/usr/bin/wherefrom"
+    for odd in (None, "", "   ", '"', 5, b"bytes"):
+        assert doctor.program_in(odd) is None, odd
+    data = tmp_path / "data"
+    data.mkdir()
+    registry = FakeRegistry({(shell.MENU_KEY + r"\command", ""): 5, (shell.RUN_KEY, shell.RUN_VALUE): "   ",
+                             (native.WINDOWS_KEYS["chromium"][0] + "\\" + native.HOST_NAME, ""): 7})
+    monkeypatch.setattr(doctor, "downloads_folder", lambda: tmp_path)
+    code, text = report(platform="win32", home=tmp_path, data_home=data, registry=registry)
+    assert code == 1 and "No right-click entry" in text and "doesn't start at sign-in" in text
+
+
+def test_the_command_changes_nothing(tmp_path, monkeypatch, capsys):
+    from wherefrom import cli
+    home = tmp_path / "fresh"
+    monkeypatch.setenv("WHEREFROM_HOME", str(home))
+    monkeypatch.setattr(doctor, "downloads_folder", lambda: tmp_path)
+    monkeypatch.setattr(shell, "WindowsRegistry", lambda: FakeRegistry())
+    assert cli.main(["doctor"]) == 1
+    assert "No database yet" in capsys.readouterr().out
+    assert not home.exists()                    # no database, no folder, no lock file
+
+
+def test_checking_the_lock_leaves_it_as_it_was(tmp_path):
+    path = lock.watch_lock(tmp_path, [tmp_path / "Downloads"])
+    assert lock.is_held(path) is False          # no file: nothing created
+    assert not path.exists()
+    held = lock.hold(path)
+    assert lock.is_held(path) is True and lock.any_watcher(tmp_path) is True
+    held.close()
+    before = path.read_bytes()                  # (Windows locks block reading while held)
+    assert before                               # the watcher's own note: its process id
+    assert lock.is_held(path) is False and lock.any_watcher(tmp_path) is False
+    assert path.read_bytes() == before          # the probe wrote nothing

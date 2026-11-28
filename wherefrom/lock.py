@@ -9,9 +9,10 @@ import os
 import sys
 
 
-def hold(path):
+def hold(path, probe=False):
     """Take the lock in `path`. Returns an open file to keep (the lock lasts as
-    long as it stays open), or None if another process holds it."""
+    long as it stays open), or None if another process holds it. With `probe`,
+    nothing is written to the file (for only checking)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     handle = open(path, "a+b")      # noqa: SIM115 - must stay open while held
     try:
@@ -25,10 +26,11 @@ def hold(path):
     except OSError:
         handle.close()
         return None
-    handle.seek(0)
-    handle.truncate()
-    handle.write(str(os.getpid()).encode())     # for people looking; nothing reads it
-    handle.flush()
+    if not probe:
+        handle.seek(0)
+        handle.truncate()
+        handle.write(str(os.getpid()).encode())     # for people looking; nothing reads it
+        handle.flush()
     return handle
 
 
@@ -45,8 +47,14 @@ def is_held(path):
     """True if some process holds the lock in `path` right now."""
     if not path.exists():
         return False
-    handle = hold(path)
+    handle = hold(path, probe=True)
     if handle is None:
         return True
     handle.close()
     return False
+
+
+def any_watcher(data_folder):
+    """True if any wherefrom watcher (for any set of folders) is running."""
+    from pathlib import Path
+    return any(is_held(p) for p in sorted((Path(data_folder) / "locks").glob("watch-*.lock")))

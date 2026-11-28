@@ -1,5 +1,6 @@
 """`wherefrom doctor`: check every part of the setup and say how to fix what
-isn't right. It only reads; nothing is changed.
+isn't right. It only reads: it creates and changes nothing (the ledger isn't
+even opened for writing, and the watcher's lock is only probed).
 
 Each check is (ok, what, fix): `fix` is shown only when `ok` is False.
 `ok` is None for something that's only information (not a problem).
@@ -38,22 +39,42 @@ def check_watcher(data_home):
     folder = downloads_folder()
     if lock.is_held(lock.watch_lock(data_home, [folder])):
         return [(True, f"The watcher is running (watching {folder})", "")]
+    if lock.any_watcher(data_home):
+        return [(True, "A watcher is running (for other folders than Downloads)", "")]
     return [(False, f"The watcher isn't running, so new downloads in {folder} aren't recorded",
              'Run "wherefrom setup", or sign out and in again if it starts at sign-in.')]
+
+
+def program_in(command):
+    """The program a registry command starts: the quoted part, or up to ".exe"."""
+    if not isinstance(command, str) or not command.strip():
+        return None
+    command = command.strip()
+    if command.startswith('"'):
+        end = command.find('"', 1)
+        return command[1:end] if end > 1 else None
+    lower = command.lower()
+    end = lower.find(".exe")
+    return command[:end + 4] if end != -1 else command.split()[0]
 
 
 def check_windows(registry):
     found = []
     command = registry.get_value(shell.MENU_KEY + r"\command", "")
-    found.append((True, "Right-click entry: \"Where did this come from?\" (Windows 11: under \"Show more options\")", "")
-                 if command else (False, "No right-click entry", SETUP))
-    if command:
-        exe = command.split('"')[1] if command.startswith('"') else command.split()[0]
-        if not Path(exe).is_file():
-            found.append((False, f"The right-click entry points to a program that's gone: {exe}", SETUP))
-    at_login = registry.get_value(shell.RUN_KEY, shell.RUN_VALUE)
-    found.append((True, "The watcher starts at sign-in", "") if at_login
-                 else (False, "The watcher doesn't start at sign-in", SETUP))
+    exe = program_in(command)
+    if not exe:
+        found.append((False, "No right-click entry", SETUP))
+    elif not Path(exe).is_file():
+        found.append((False, f"The right-click entry points to a program that's gone: {exe}", SETUP))
+    else:
+        found.append((True, "Right-click entry: \"Where did this come from?\" (Windows 11: under \"Show more options\")", ""))
+    at_login = program_in(registry.get_value(shell.RUN_KEY, shell.RUN_VALUE))
+    if not at_login:
+        found.append((False, "The watcher doesn't start at sign-in", SETUP))
+    elif not Path(at_login).is_file():
+        found.append((False, f"Start at sign-in points to a program that's gone: {at_login}", SETUP))
+    else:
+        found.append((True, "The watcher starts at sign-in", ""))
     for kind, label in (("chromium", "Chrome, Edge, Brave, Opera, Vivaldi"), ("firefox", "Firefox and browsers built on it")):
         manifest = registry.get_value(native.WINDOWS_KEYS[kind][0] + "\\" + native.HOST_NAME, "")
         found.append(check_host_manifest(manifest, label))
@@ -78,7 +99,7 @@ def check_files(platform, home):
 
 def check_host_manifest(manifest, label):
     """The browser connection: registered, and pointing at a helper that exists."""
-    if not manifest:      # only matters with the extension, so information, not a problem
+    if not isinstance(manifest, str) or not manifest.strip():   # only matters with the extension: information
         return (None, f"Browser extension not connected for {label} (only needed with the extension: "
                       f"wherefrom browser setup)", "")
     try:

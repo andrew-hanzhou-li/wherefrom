@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -72,7 +73,13 @@ def cmd_search(args, ledger):
 def cmd_watch(args, ledger):
     from . import lock
     folders = args.folder or [downloads_folder()]
-    held = lock.hold(lock.watch_lock(Path(ledger.path).parent, folders))
+    path = lock.watch_lock(Path(ledger.path).parent, folders)
+    held = lock.hold(path)
+    for _ in range(8):           # something only checking (wherefrom doctor) lets go within moments
+        if held is not None:
+            break
+        time.sleep(0.25)
+        held = lock.hold(path)
     if held is None:
         print("A wherefrom watcher for " + ", ".join(str(f) for f in folders) + " is already running.")
         return 0
@@ -227,7 +234,7 @@ def build_parser():
     setup.set_defaults(run=cmd_setup)
 
     doctor = sub.add_parser("doctor", help="check the setup and say how to fix anything that isn't right")
-    doctor.set_defaults(run=cmd_doctor)
+    doctor.set_defaults(run=cmd_doctor, no_ledger=True)
 
     show = sub.add_parser("show", help="where a file came from")
     show.add_argument("file")
@@ -298,6 +305,8 @@ def main(argv=None):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     args = build_parser().parse_args(argv)
+    if getattr(args, "no_ledger", False):       # doctor only looks; opening the ledger would create it
+        return args.run(args, None)
     ledger = Ledger()
     try:
         return args.run(args, ledger)
